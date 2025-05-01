@@ -9,7 +9,7 @@ export default function SignInPage() {
       <div className="w-full max-w-sm space-y-6 text-center">
         {/* Logo/Brand */}
         <div className="space-y-2">
-          <h1 className="text-4xl font-semibold text-white">recoin.</h1>
+          <h1 className="text-4xl font-semibold text-white">trackwise.</h1>
           <p className="text-lg text-gray-400">
             Take control of your financial life.
           </p>
