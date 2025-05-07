@@ -1,5 +1,8 @@
 import { PrismaClient } from "@prisma/client";
 
+// Add type declaration for prisma on globalThis
+
+
 export const db = globalThis.prisma || new PrismaClient();
 
 if (process.env.NODE_ENV !== "production") {
