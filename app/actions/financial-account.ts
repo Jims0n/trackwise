@@ -85,7 +85,7 @@ export async function getFinancialAccounts() {
     }));
     
     return { accounts: serializedAccounts };
-  } catch (_error) {
+  } catch (error) {
     return { error: "Failed to fetch accounts" };
   }
 }
