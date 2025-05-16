@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { getAvailableCurrencies } from "@/lib/currency";
+import { InstallPrompt } from "@/components/install-prompt";
 
 // Import the select components directly from the file we created
 import { 
@@ -64,6 +65,9 @@ export default function CurrencySelectionPage() {
     <div className="min-h-screen bg-[#1E1E1E] flex flex-col items-center justify-center p-4" 
          style={{ backgroundImage: "linear-gradient(rgba(0, 0, 0, 0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 0, 0, 0.1) 1px, transparent 1px)", 
                   backgroundSize: "40px 40px" }}>
+      {/* Install Prompt for iOS Safari users */}
+      <InstallPrompt />
+      
       <Card className="w-full max-w-md bg-transparent border-0 text-white">
         <div className="space-y-6">
           <div className="space-y-2">
