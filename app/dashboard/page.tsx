@@ -39,11 +39,6 @@ export default function Dashboard() {
         </div>
         
         <div className="bg-card shadow rounded-lg p-6 border border-border">
-          <h3 className="text-lg font-semibold mb-2">Transactions</h3>
-          <p className="text-muted-foreground">Coming soon: Track your income and expenses</p>
-        </div>
-        
-        <div className="bg-card shadow rounded-lg p-6 border border-border">
           <h3 className="text-lg font-semibold mb-2">Budgets</h3>
           <p className="text-muted-foreground">Coming soon: Set and monitor your budgets</p>
         </div>

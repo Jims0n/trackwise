@@ -33,13 +33,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               <FiCreditCard className="h-5 w-5" />
               <span>Accounts</span>
             </Link>
-            <Link 
-              href="/dashboard/transactions" 
-              className="flex items-center space-x-2 p-2 rounded-md hover:bg-accent transition-colors"
-            >
-              <FiDollarSign className="h-5 w-5" />
-              <span>Transactions</span>
-            </Link>
+            
             <Link 
               href="/dashboard/budgets" 
               className="flex items-center space-x-2 p-2 rounded-md hover:bg-accent transition-colors"

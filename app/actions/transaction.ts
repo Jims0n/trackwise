@@ -62,12 +62,21 @@ export async function createTransaction(formData: CreateTransactionFormData) {
       });
     }
     
+    // Serialize the transaction data for client components
+    const serializedTransaction = {
+      ...transaction,
+      amount: Number(transaction.amount),
+      date: transaction.date.toISOString(),
+      createdAt: transaction.createdAt.toISOString(),
+      updatedAt: transaction.updatedAt.toISOString(),
+    };
+    
     // Revalidate the dashboard path to reflect the new transaction
     revalidatePath("/dashboard");
     revalidatePath("/dashboard/transactions");
     revalidatePath("/dashboard/accounts");
     
-    return { success: true, transaction };
+    return { success: true, transaction: serializedTransaction };
   } catch (error) {
     if (error instanceof z.ZodError) {
       return { error: error.errors[0].message };
@@ -89,7 +98,22 @@ export async function getTransactions() {
       include: { account: true },
     });
     
-    return { transactions };
+    // Convert Decimal to number for serialization
+    const serializedTransactions = transactions.map(transaction => ({
+      ...transaction,
+      amount: Number(transaction.amount),
+      date: transaction.date.toISOString(),
+      createdAt: transaction.createdAt.toISOString(),
+      updatedAt: transaction.updatedAt.toISOString(),
+      account: {
+        ...transaction.account,
+        balance: Number(transaction.account.balance),
+        createdAt: transaction.account.createdAt.toISOString(),
+        updatedAt: transaction.account.updatedAt.toISOString(),
+      }
+    }));
+    
+    return { transactions: serializedTransactions };
   } catch (error) {
     return { error: "Failed to fetch transactions" };
   }
