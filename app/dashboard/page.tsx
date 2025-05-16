@@ -3,6 +3,7 @@
 import { SignInButton } from "@/components/auth-button";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 
 export default function Dashboard() {
   const { data: session, status } = useSession();
@@ -13,6 +14,18 @@ export default function Dashboard() {
     router.push("/");
     return null; // Return null while redirecting
   }
+  
+  // Check if user has selected a currency (only on client side)
+  useEffect(() => {
+    if (status === "authenticated") {
+      const hasCurrency = document.cookie.split(';').some(cookie => cookie.trim().startsWith('userCurrency='));
+      
+      if (!hasCurrency) {
+        console.log('No currency cookie found in dashboard, redirecting to currency selection');
+        router.push('/onboarding/currency');
+      }
+    }
+  }, [status, router]);
 
   // Show loading state while checking authentication
   if (status === "loading") {

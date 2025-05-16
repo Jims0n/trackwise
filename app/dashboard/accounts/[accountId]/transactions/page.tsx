@@ -167,7 +167,7 @@ export default function AccountTransactionsPage({
           {transactions.length > 0 ? (
             <TransactionList accountId={accountId} />
           ) : (
-            <div className="flex flex-col items-center justify-center h-40 bg-gray-50 rounded-lg">
+            <div className="flex flex-col items-center justify-center h-40 rounded-lg">
               <p className="text-gray-500 mb-4">No transactions found</p>
               <Button onClick={handleAddTransaction} variant="outline">Add your first transaction</Button>
             </div>

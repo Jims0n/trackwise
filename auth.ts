@@ -22,6 +22,11 @@ export const authOptions: NextAuthOptions = {
     pages: {
         signIn: '/',
     },
+    events: {
+        async signIn({ user }) {
+            console.log('User signed in:', user);
+        },
+    },
     callbacks: {
         async session({ session, token }) {
             if (session?.user) {

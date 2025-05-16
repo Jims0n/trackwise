@@ -2,6 +2,10 @@ import { SignInButton } from "@/components/auth-button";
 import Link from "next/link";
 import { ReactNode } from "react";
 import { FiHome, FiCreditCard, FiDollarSign, FiPieChart } from "react-icons/fi";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/auth";
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   return (

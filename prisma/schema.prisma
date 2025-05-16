@@ -20,6 +20,7 @@ model User {
   email             String             @unique
   name              String?
   image             String?
+  emailVerified     DateTime?          // Added for NextAuth compatibility
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
   accounts          Account[]
