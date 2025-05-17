@@ -5,7 +5,23 @@ import { Button } from "./ui/button";
 import Image from "next/image";
 
 export function SignInButton() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
+
+  // Show a subtle loading state while checking authentication
+  if (status === "loading") {
+    return (
+      <div className="flex items-center gap-4 opacity-70 animate-pulse">
+        <div className="h-6 w-32 bg-gray-200 rounded"></div>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled
+        >
+          <span className="opacity-0">Loading</span>
+        </Button>
+      </div>
+    );
+  }
 
   if (session && session.user) {
     return (
