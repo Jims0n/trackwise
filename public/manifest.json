@@ -1,0 +1,26 @@
+{
+  "name": "Trackwise – Personal Finance",
+  "short_name": "Trackwise",
+  "description": "Take control of your financial life",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#FAFAFA",
+  "theme_color": "#10B981",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["finance", "productivity"],
+  "screenshots": []
+}

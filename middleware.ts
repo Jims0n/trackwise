@@ -11,10 +11,22 @@ export async function middleware(request: NextRequest) {
   const isOnboardingPath = request.nextUrl.pathname.startsWith("/onboarding");
   const isDashboardPath = request.nextUrl.pathname.startsWith("/dashboard");
   
+  // Check if user has selected currency
+  const hasCurrency = request.cookies.has('userCurrency');
 
-  // If the user is on a public path and is authenticated, redirect to dashboard
+  // If the user is on a public path and is authenticated
   if (isPublicPath && isAuthenticated) {
+    // If they haven't selected currency, send to onboarding
+    if (!hasCurrency) {
+      return NextResponse.redirect(new URL("/onboarding/currency", request.url));
+    }
+    // Otherwise send to dashboard
     return NextResponse.redirect(new URL("/dashboard", request.url));
+  }
+
+  // If the user is on dashboard but hasn't selected currency, redirect to onboarding
+  if (isDashboardPath && isAuthenticated && !hasCurrency) {
+    return NextResponse.redirect(new URL("/onboarding/currency", request.url));
   }
 
   // If the user is on a protected path and is not authenticated, redirect to home
@@ -22,8 +34,8 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/", request.url));
   }
 
-  // Allow access to onboarding paths even when authenticated
-  // The client-side check in dashboard will handle redirecting to currency selection if needed
+  // Prevent authenticated users without currency from accessing dashboard
+  // Allow access to onboarding paths when authenticated
 
   return NextResponse.next();
 }
