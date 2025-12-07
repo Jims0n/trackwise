@@ -1,6 +1,5 @@
 "use client";
 
-import { SignInButton } from "@/components/auth-button";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
@@ -9,14 +8,13 @@ export default function Dashboard() {
   const { data: session, status } = useSession();
   const router = useRouter();
   
-  // If the user is not authenticated, redirect to home page
-  if (status === "unauthenticated") {
-    router.push("/");
-    return null; // Return null while redirecting
-  }
-  
-  // Check if user has selected a currency (only on client side)
+  // Check authentication and currency selection (must be before any conditional returns)
   useEffect(() => {
+    if (status === "unauthenticated") {
+      router.push("/");
+      return;
+    }
+    
     if (status === "authenticated") {
       const hasCurrency = document.cookie.split(';').some(cookie => cookie.trim().startsWith('userCurrency='));
       

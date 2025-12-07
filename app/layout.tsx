@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Instrument_Sans } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/components/auth-provider";
+import { Toaster } from "@/components/ui/sonner";
 
 const instrument = Instrument_Sans({
   subsets: ['latin'],
@@ -24,6 +25,7 @@ export default function RootLayout({
        className={`${instrument.variable} font-instrument`}
       >
         <AuthProvider>{children}</AuthProvider>
+        <Toaster richColors position="top-right" closeButton />
       </body>
     </html>
   );
