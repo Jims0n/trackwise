@@ -201,6 +201,15 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
   );
 }
 
+const ACCOUNT_TYPES = [
+  { value: 'CHECKING', label: 'Checking', icon: '🏦' },
+  { value: 'SAVINGS', label: 'Savings', icon: '🐷' },
+  { value: 'CREDIT_CARD', label: 'Credit Card', icon: '💳' },
+  { value: 'CASH', label: 'Cash', icon: '💵' },
+  { value: 'INVESTMENT', label: 'Investment', icon: '📈' },
+  { value: 'CRYPTO', label: 'Crypto', icon: '₿' },
+] as const;
+
 function AddAccountModal({
   isOpen,
   onClose,
@@ -212,9 +221,10 @@ function AddAccountModal({
 }) {
   const [name, setName] = useState('');
   const [balance, setBalance] = useState('');
+  const [accountType, setAccountType] = useState<typeof ACCOUNT_TYPES[number]['value']>('CHECKING');
   const [isDefault, setIsDefault] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { currencySymbol } = useUIStore();
+  const { currencySymbol, currency } = useUIStore();
 
   const handleSubmit = async () => {
     if (!name.trim()) {
@@ -226,7 +236,9 @@ function AddAccountModal({
     try {
       const result = await createFinancialAccount({
         name: name.trim(),
+        type: accountType,
         balance: parseFloat(balance) || 0,
+        currency: currency || 'USD',
         isDefault,
       });
 
@@ -236,6 +248,7 @@ function AddAccountModal({
         toast.success('Account created successfully!');
         setName('');
         setBalance('');
+        setAccountType('CHECKING');
         setIsDefault(false);
         onSuccess();
       }
@@ -282,7 +295,30 @@ function AddAccountModal({
             </div>
 
             {/* Form */}
-            <div className="px-6 pb-8 space-y-4">
+            <div className="px-6 pb-8 space-y-4 overflow-y-auto max-h-[60vh]">
+              <div>
+                <label className="text-micro block mb-2">ACCOUNT TYPE</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {ACCOUNT_TYPES.map((type) => (
+                    <motion.button
+                      key={type.value}
+                      type="button"
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => setAccountType(type.value)}
+                      className={cn(
+                        'flex flex-col items-center gap-1 p-3 rounded-xl border-2 transition-all',
+                        accountType === type.value
+                          ? 'border-[rgb(var(--primary))] bg-[rgb(var(--primary))]/10'
+                          : 'border-transparent bg-[rgb(var(--background-secondary))]'
+                      )}
+                    >
+                      <span className="text-xl">{type.icon}</span>
+                      <span className="text-xs font-medium">{type.label}</span>
+                    </motion.button>
+                  ))}
+                </div>
+              </div>
+
               <div>
                 <label className="text-micro block mb-2">ACCOUNT NAME</label>
                 <input

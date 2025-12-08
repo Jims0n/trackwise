@@ -12,21 +12,11 @@ import { cn } from "@/lib/utils";
 import { PageContainer, StaggerContainer, StaggerItem } from "@/components/layout/page-container";
 import { use } from "react";
 
-type FinancialAccount = {
-  id: string;
-  name: string;
-  balance: number;
-  isDefault: boolean;
-};
-
-type Transaction = {
-  id: string;
-  type: 'INCOME' | 'EXPENSE';
-  amount: number;
-  description: string | null;
-  category: string;
-  date: string | Date;
-};
+import type { 
+  FinancialAccount, 
+  Transaction,
+  TransactionType 
+} from "@/types";
 
 export default function AccountTransactionsPage({
   params,
@@ -73,7 +63,7 @@ export default function AccountTransactionsPage({
           const accountTransactions = transactionsResult.transactions.filter(
             (t: any) => t.accountId === selectedAccount.id
           );
-          setTransactions(accountTransactions);
+          setTransactions(accountTransactions as Transaction[]);
           
           let income = 0;
           let expense = 0;
@@ -109,19 +99,12 @@ export default function AccountTransactionsPage({
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
-  const getCategoryIcon = (category: string): string => {
-    const iconMap: Record<string, string> = {
-      'Food & Dining': '🍔',
-      'Shopping': '🛍️',
-      'Transportation': '🚗',
-      'Entertainment': '🎬',
-      'Bills & Utilities': '💡',
-      'Healthcare': '🏥',
-      'Salary': '💰',
-      'Freelance': '💼',
-      'Investment': '📈',
-    };
-    return iconMap[category] || '📦';
+  const getCategoryIcon = (transaction: Transaction): string => {
+    return transaction.category?.icon || '�';
+  };
+
+  const getCategoryName = (transaction: Transaction): string => {
+    return transaction.category?.name || 'Uncategorized';
   };
 
   if (isLoading) {
@@ -244,14 +227,14 @@ export default function AccountTransactionsPage({
                       ? 'bg-[rgb(var(--income))]/10' 
                       : 'bg-[rgb(var(--expense))]/10'
                   )}>
-                    {getCategoryIcon(transaction.category)}
+                    {getCategoryIcon(transaction)}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium truncate">
-                      {transaction.description || transaction.category}
+                      {transaction.description || getCategoryName(transaction)}
                     </p>
                     <p className="text-sm text-[rgb(var(--foreground-muted))]">
-                      {transaction.category} · {formatDate(transaction.date)}
+                      {getCategoryName(transaction)} · {formatDate(transaction.date)}
                     </p>
                   </div>
                   <p className={cn(

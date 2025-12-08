@@ -5,8 +5,8 @@ import type {
   Transaction, 
   MonthlyCashFlow,
   NetWorth,
-  SavingsGoal,
-  TransactionFilters 
+  TransactionFilters,
+  CategorySummary,
 } from '@/types';
 
 // Custom storage that checks for window availability
@@ -29,7 +29,6 @@ interface FinanceState {
   // Data
   accounts: FinancialAccount[];
   transactions: Transaction[];
-  savingsGoals: SavingsGoal[];
   
   // Computed (cached)
   netWorth: NetWorth | null;
@@ -54,12 +53,6 @@ interface FinanceState {
   updateTransaction: (id: string, updates: Partial<Transaction>) => void;
   deleteTransaction: (id: string) => void;
   
-  // Actions - Savings Goals
-  setSavingsGoals: (goals: SavingsGoal[]) => void;
-  addSavingsGoal: (goal: SavingsGoal) => void;
-  updateSavingsGoal: (id: string, updates: Partial<SavingsGoal>) => void;
-  deleteSavingsGoal: (id: string) => void;
-  
   // Actions - Computed
   computeNetWorth: () => void;
   computeCurrentMonthCashFlow: () => void;
@@ -81,6 +74,7 @@ const defaultFilters: TransactionFilters = {
   accounts: [],
   categories: [],
   types: [],
+  statuses: [],
 };
 
 export const useFinanceStore = create<FinanceState>()(
@@ -89,7 +83,6 @@ export const useFinanceStore = create<FinanceState>()(
       // Initial state
       accounts: [],
       transactions: [],
-      savingsGoals: [],
       netWorth: null,
       currentMonthCashFlow: null,
       filters: defaultFilters,
@@ -154,31 +147,23 @@ export const useFinanceStore = create<FinanceState>()(
         get().computeNetWorth();
       },
       
-      // Savings Goals actions
-      setSavingsGoals: (goals) => set({ savingsGoals: goals }),
-      
-      addSavingsGoal: (goal) => {
-        set((state) => ({ savingsGoals: [...state.savingsGoals, goal] }));
-      },
-      
-      updateSavingsGoal: (id, updates) => {
-        set((state) => ({
-          savingsGoals: state.savingsGoals.map((g) =>
-            g.id === id ? { ...g, ...updates } : g
-          ),
-        }));
-      },
-      
-      deleteSavingsGoal: (id) => {
-        set((state) => ({
-          savingsGoals: state.savingsGoals.filter((g) => g.id !== id),
-        }));
-      },
-      
       // Compute net worth from accounts
       computeNetWorth: () => {
         const { accounts } = get();
-        const total = accounts.reduce((sum, acc) => sum + acc.balance, 0);
+        const liabilityTypes = ['CREDIT_CARD', 'LOAN'];
+        
+        let assets = 0;
+        let liabilities = 0;
+        
+        accounts.forEach(acc => {
+          if (liabilityTypes.includes(acc.type)) {
+            liabilities += acc.balance;
+          } else {
+            assets += acc.balance;
+          }
+        });
+        
+        const total = assets - liabilities;
         
         // For now, we'll calculate change based on stored previous value
         // In production, this would come from historical data
@@ -191,7 +176,8 @@ export const useFinanceStore = create<FinanceState>()(
           accountName: acc.name,
           accountType: acc.type,
           balance: acc.balance,
-          color: acc.color || '#10B981',
+          currency: acc.currency,
+          color: acc.color,
         }));
         
         set({
@@ -199,6 +185,8 @@ export const useFinanceStore = create<FinanceState>()(
             total,
             change,
             changePercentage,
+            assets,
+            liabilities,
             byAccount,
           },
         });
@@ -228,18 +216,22 @@ export const useFinanceStore = create<FinanceState>()(
         const savingsRate = income > 0 ? (savings / income) * 100 : 0;
         
         // Calculate by category
-        const categoryMap = new Map<string, { amount: number; count: number; icon: string; color: string }>();
+        const categoryMap = new Map<string, { id: string; amount: number; count: number; icon: string; color: string }>();
         
         monthTransactions
           .filter((t) => t.type === 'EXPENSE')
           .forEach((t) => {
-            const existing = categoryMap.get(t.category) || { 
+            const catId = t.categoryId || 'other';
+            const catName = t.category?.name || 'Other';
+            const existing = categoryMap.get(catName) || { 
+              id: catId,
               amount: 0, 
               count: 0,
-              icon: t.categoryIcon || '📦',
-              color: '#71717A'
+              icon: t.category?.icon || '📦',
+              color: t.category?.color || '#71717A'
             };
-            categoryMap.set(t.category, {
+            categoryMap.set(catName, {
+              id: existing.id,
               amount: existing.amount + t.amount,
               count: existing.count + 1,
               icon: existing.icon,
@@ -247,14 +239,15 @@ export const useFinanceStore = create<FinanceState>()(
             });
           });
         
-        const byCategory = Array.from(categoryMap.entries())
+        const byCategory: CategorySummary[] = Array.from(categoryMap.entries())
           .map(([category, data]) => ({
+            categoryId: data.id,
             category,
             icon: data.icon,
             color: data.color,
             amount: data.amount,
             percentage: expenses > 0 ? (data.amount / expenses) * 100 : 0,
-            transactions: data.count,
+            transactionCount: data.count,
           }))
           .sort((a, b) => b.amount - a.amount);
         
@@ -292,7 +285,6 @@ export const useFinanceStore = create<FinanceState>()(
         // Only persist these fields
         accounts: state.accounts,
         transactions: state.transactions,
-        savingsGoals: state.savingsGoals,
       }),
     }
   )

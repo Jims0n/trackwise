@@ -67,7 +67,7 @@ function TransactionRow({
 
   const getIcon = () => {
     if (isTransfer) return '↔️';
-    return transaction.categoryIcon || (isIncome ? '💰' : '📦');
+    return transaction.category?.icon || (isIncome ? '💰' : '📦');
   };
 
   const getAmountColor = () => {
@@ -96,10 +96,10 @@ function TransactionRow({
       {/* Details */}
       <div className="flex-1 min-w-0">
         <p className="font-medium text-[rgb(var(--foreground))] truncate">
-          {transaction.description || transaction.category}
+          {transaction.description || transaction.category?.name || 'Transaction'}
         </p>
         <p className="text-xs text-[rgb(var(--foreground-muted))] mt-0.5">
-          {transaction.category} · {formatDistanceToNow(new Date(transaction.date), { addSuffix: true })}
+          {transaction.category?.name || 'Uncategorized'} · {formatDistanceToNow(new Date(transaction.date), { addSuffix: true })}
         </p>
       </div>
 
@@ -108,12 +108,7 @@ function TransactionRow({
         <p className={cn('font-semibold tabular-nums', getAmountColor())}>
           {getAmountPrefix()}{currencySymbol}{transaction.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
         </p>
-        {transaction.accountName && (
-          <p className="text-xs text-[rgb(var(--foreground-muted))] mt-0.5">
-            {transaction.accountName}
-          </p>
-        )}
-      </div>
+              </div>
 
       {/* Arrow indicator */}
       <div className={cn('p-1', getAmountColor())}>
@@ -165,11 +160,11 @@ export function TransactionItem({
       className="flex items-center gap-3 w-full p-3 rounded-xl hover:bg-[rgb(var(--background-secondary))] transition-colors text-left"
     >
       <div className="w-8 h-8 rounded-lg bg-[rgb(var(--background-secondary))] flex items-center justify-center text-sm">
-        {transaction.categoryIcon || (isIncome ? '💰' : '📦')}
+        {transaction.category?.icon || (isIncome ? '💰' : '📦')}
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium truncate">
-          {transaction.description || transaction.category}
+          {transaction.description || transaction.category?.name || 'Transaction'}
         </p>
       </div>
       <p className={cn(

@@ -7,9 +7,10 @@ import { useUIStore } from '@/stores/ui-store';
 import { useFinanceStore } from '@/stores/finance-store';
 import { cn } from '@/lib/utils';
 import { createTransaction } from '@/app/actions/transaction';
+import { getFinancialAccounts } from '@/app/actions/financial-account';
 import { toast } from 'sonner';
-import type { TransactionType, Category } from '@/types';
-import { DEFAULT_INCOME_CATEGORIES, DEFAULT_EXPENSE_CATEGORIES } from '@/types';
+import type { TransactionType, Category, FinancialAccount } from '@/types';
+import { getCategories } from '@/app/actions/category';
 
 // Backdrop animation
 const backdropVariants = {
@@ -40,7 +41,11 @@ const modalVariants = {
 
 export function AddTransactionModal() {
   const { isAddModalOpen, addModalType, closeAddModal, currencySymbol } = useUIStore();
-  const { accounts, addTransaction } = useFinanceStore();
+  const { accounts: storeAccounts, addTransaction, setAccounts } = useFinanceStore();
+  
+  // Local accounts state (in case store is empty)
+  const [localAccounts, setLocalAccounts] = useState<FinancialAccount[]>([]);
+  const accounts = storeAccounts.length > 0 ? storeAccounts : localAccounts;
   
   // Form state
   const [type, setType] = useState<TransactionType>('EXPENSE');
@@ -53,6 +58,22 @@ export function AddTransactionModal() {
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const [showAccountPicker, setShowAccountPicker] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Load accounts if store is empty
+  useEffect(() => {
+    async function loadAccounts() {
+      if (storeAccounts.length === 0) {
+        const result = await getFinancialAccounts();
+        if (result.accounts) {
+          setLocalAccounts(result.accounts);
+          setAccounts(result.accounts); // Also update store
+        }
+      }
+    }
+    if (isAddModalOpen) {
+      loadAccounts();
+    }
+  }, [isAddModalOpen, storeAccounts.length, setAccounts]);
 
   // Reset form when modal opens
   useEffect(() => {
@@ -71,7 +92,20 @@ export function AddTransactionModal() {
     }
   }, [isAddModalOpen, addModalType, accounts]);
 
-  const categories = type === 'INCOME' ? DEFAULT_INCOME_CATEGORIES : DEFAULT_EXPENSE_CATEGORIES;
+  const [categories, setCategories] = useState<Category[]>([]);
+
+  // Load categories from server
+  useEffect(() => {
+    async function loadCategories() {
+      const result = await getCategories(type);
+      if (result.categories) {
+        setCategories(result.categories);
+      }
+    }
+    if (isAddModalOpen) {
+      loadCategories();
+    }
+  }, [isAddModalOpen, type]);
   const selectedAccount = accounts.find(a => a.id === selectedAccountId);
 
   const handleSubmit = async () => {
@@ -96,10 +130,8 @@ export function AddTransactionModal() {
         amount: parseFloat(amount),
         description: description || undefined,
         date: new Date(date),
-        category: category.name,
+        categoryId: category.id,
         accountId: selectedAccountId,
-        isRecurring,
-        recurringInterval: isRecurring ? 'MONTHLY' : undefined,
       });
 
       if (result.error) {
