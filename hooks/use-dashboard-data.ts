@@ -1,9 +1,17 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import type { 
+  MonthlyCashFlow, 
+  NetWorth, 
+  Transaction, 
+  FinancialAccount,
+  AccountType,
+  CategorySummary
+} from '@/types';
 import { useFinanceStore } from '@/stores/finance-store';
-import type { MonthlyCashFlow, NetWorth, Transaction, FinancialAccount } from '@/types';
 
+// Simple in-memory store for dashboard data
 interface DashboardData {
   netWorth: NetWorth | null;
   monthlyFlow: MonthlyCashFlow | null;
@@ -14,41 +22,25 @@ interface DashboardData {
 }
 
 export function useDashboardData(): DashboardData {
-  const {
-    accounts,
-    transactions,
-    netWorth,
-    currentMonthCashFlow,
-    setAccounts,
-    setTransactions,
-    computeNetWorth,
-    computeCurrentMonthCashFlow,
-    isLoading,
-    setLoading,
-  } = useFinanceStore();
-
+  const [accounts, setAccountsLocal] = useState<FinancialAccount[]>([]);
+  const [transactions, setTransactionsLocal] = useState<Transaction[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isInitialized, setIsInitialized] = useState(false);
+  
+  // Get store actions to sync data globally
+  const { setAccounts: setStoreAccounts, setTransactions: setStoreTransactions } = useFinanceStore();
 
   // Fetch data from API
   const fetchData = useCallback(async () => {
-    setLoading(true);
+    setIsLoading(true);
     try {
       // Fetch accounts
       const accountsRes = await fetch('/api/accounts');
       if (accountsRes.ok) {
         const accountsData = await accountsRes.json();
         if (accountsData.accounts) {
-          const mappedAccounts = accountsData.accounts.map((acc: any) => ({
-            id: acc.id,
-            name: acc.name,
-            type: 'bank' as const, // Default type
-            balance: Number(acc.balance),
-            currency: 'USD',
-            isDefault: acc.isDefault,
-            lastUpdated: new Date(acc.updatedAt),
-            createdAt: new Date(acc.createdAt),
-          }));
-          setAccounts(mappedAccounts);
+          setAccountsLocal(accountsData.accounts);
+          setStoreAccounts(accountsData.accounts); // Sync to global store
         }
       }
 
@@ -57,31 +49,17 @@ export function useDashboardData(): DashboardData {
       if (transactionsRes.ok) {
         const transactionsData = await transactionsRes.json();
         if (transactionsData.transactions) {
-          const mappedTransactions = transactionsData.transactions.map((t: any) => ({
-            id: t.id,
-            type: t.type,
-            amount: Number(t.amount),
-            description: t.description,
-            date: new Date(t.date),
-            category: t.category,
-            categoryIcon: getCategoryIcon(t.category),
-            accountId: t.accountId,
-            accountName: t.account?.name,
-            isRecurring: t.isRecurring,
-            recurringInterval: t.recurringInterval,
-            status: t.status,
-            createdAt: new Date(t.createdAt),
-          }));
-          setTransactions(mappedTransactions);
+          setTransactionsLocal(transactionsData.transactions);
+          setStoreTransactions(transactionsData.transactions); // Sync to global store
         }
       }
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
     } finally {
-      setLoading(false);
+      setIsLoading(false);
       setIsInitialized(true);
     }
-  }, [setAccounts, setTransactions, setLoading]);
+  }, [setStoreAccounts, setStoreTransactions]);
 
   // Initial fetch
   useEffect(() => {
@@ -90,27 +68,22 @@ export function useDashboardData(): DashboardData {
     }
   }, [isInitialized, fetchData]);
 
-  // Compute derived data when base data changes
-  useEffect(() => {
-    if (accounts.length > 0) {
-      computeNetWorth();
-    }
-  }, [accounts, computeNetWorth]);
+  // Compute net worth from accounts
+  const netWorth: NetWorth | null = accounts.length > 0 ? computeNetWorth(accounts) : null;
 
-  useEffect(() => {
-    if (transactions.length > 0) {
-      computeCurrentMonthCashFlow();
-    }
-  }, [transactions, computeCurrentMonthCashFlow]);
+  // Compute monthly flow from transactions
+  const monthlyFlow: MonthlyCashFlow | null = transactions.length > 0 
+    ? computeMonthlyFlow(transactions) 
+    : null;
 
   // Get recent transactions (last 5)
-  const recentTransactions = transactions
+  const recentTransactions = [...transactions]
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     .slice(0, 5);
 
   return {
     netWorth,
-    monthlyFlow: currentMonthCashFlow,
+    monthlyFlow,
     recentTransactions,
     accounts,
     isLoading,
@@ -118,42 +91,171 @@ export function useDashboardData(): DashboardData {
   };
 }
 
-// Helper to get category icons
-function getCategoryIcon(category: string): string {
-  const icons: Record<string, string> = {
-    'Salary': '💼',
-    'Freelance': '💻',
-    'Investments': '📈',
-    'Gifts': '🎁',
-    'Food & Dining': '🍔',
-    'Transport': '🚗',
-    'Shopping': '🛍️',
-    'Entertainment': '🎬',
-    'Bills & Utilities': '📱',
-    'Health': '💊',
-    'Education': '📚',
-    'Travel': '✈️',
-    'Groceries': '🛒',
-    'Subscriptions': '📺',
+// Compute net worth from accounts
+function computeNetWorth(accounts: FinancialAccount[]): NetWorth {
+  const liabilityTypes: AccountType[] = ['CREDIT_CARD', 'LOAN'];
+  
+  let assets = 0;
+  let liabilities = 0;
+  
+  const byAccount = accounts.map(acc => {
+    const isLiability = liabilityTypes.includes(acc.type);
+    if (isLiability) {
+      liabilities += acc.balance;
+    } else {
+      assets += acc.balance;
+    }
+    return {
+      accountId: acc.id,
+      accountName: acc.name,
+      accountType: acc.type,
+      balance: acc.balance,
+      currency: acc.currency,
+      color: acc.color,
+    };
+  });
+
+  const total = assets - liabilities;
+
+  return {
+    total,
+    change: 0, // Would need historical data
+    changePercentage: 0,
+    assets,
+    liabilities,
+    byAccount,
   };
-  return icons[category] || '📦';
 }
 
-// Hook to use demo data for development
+// Compute monthly cash flow from transactions
+function computeMonthlyFlow(transactions: Transaction[]): MonthlyCashFlow {
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const monthName = now.toLocaleString('default', { month: 'long' });
+
+  // Filter to current month
+  const monthTransactions = transactions.filter(t => {
+    const txDate = new Date(t.date);
+    return txDate >= monthStart;
+  });
+
+  let income = 0;
+  let expenses = 0;
+  const categoryTotals: Record<string, { amount: number; icon: string; color: string; count: number }> = {};
+
+  for (const tx of monthTransactions) {
+    if (tx.type === 'INCOME') {
+      income += tx.amount;
+    } else if (tx.type === 'EXPENSE') {
+      expenses += tx.amount;
+      
+      const catName = tx.category?.name || 'Other';
+      if (!categoryTotals[catName]) {
+        categoryTotals[catName] = {
+          amount: 0,
+          icon: tx.category?.icon || '📦',
+          color: tx.category?.color || '#6B7280',
+          count: 0,
+        };
+      }
+      categoryTotals[catName].amount += tx.amount;
+      categoryTotals[catName].count++;
+    }
+  }
+
+  const savings = income - expenses;
+  const savingsRate = income > 0 ? (savings / income) * 100 : 0;
+
+  const byCategory: CategorySummary[] = Object.entries(categoryTotals)
+    .map(([category, data]) => ({
+      categoryId: category,
+      category,
+      icon: data.icon,
+      color: data.color,
+      amount: data.amount,
+      percentage: expenses > 0 ? (data.amount / expenses) * 100 : 0,
+      transactionCount: data.count,
+    }))
+    .sort((a, b) => b.amount - a.amount);
+
+  return {
+    month: monthName,
+    year: now.getFullYear(),
+    income,
+    expenses,
+    savings,
+    savingsRate,
+    byCategory,
+  };
+}
+
+// Hook to use demo data for development/empty states
 export function useDemoData(): DashboardData {
   const now = new Date();
   const monthName = now.toLocaleString('default', { month: 'long' });
 
+  const demoAccounts: FinancialAccount[] = [
+    {
+      id: '1',
+      userId: 'demo',
+      name: 'Main Checking',
+      type: 'CHECKING',
+      balance: 5200,
+      currency: 'USD',
+      icon: '🏦',
+      color: '#10B981',
+      status: 'ACTIVE',
+      isDefault: true,
+      sortOrder: 0,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    },
+    {
+      id: '2',
+      userId: 'demo',
+      name: 'Savings',
+      type: 'SAVINGS',
+      balance: 4500,
+      currency: 'USD',
+      icon: '🐷',
+      color: '#3B82F6',
+      status: 'ACTIVE',
+      isDefault: false,
+      sortOrder: 1,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    },
+    {
+      id: '3',
+      userId: 'demo',
+      name: 'Cash',
+      type: 'CASH',
+      balance: 750,
+      currency: 'USD',
+      icon: '💵',
+      color: '#F59E0B',
+      status: 'ACTIVE',
+      isDefault: false,
+      sortOrder: 2,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    },
+  ];
+
   const demoNetWorth: NetWorth = {
-    total: 12450.00,
+    total: 10450.00,
     change: 245.50,
     changePercentage: 2.4,
-    byAccount: [
-      { accountId: '1', accountName: 'Main Checking', accountType: 'bank', balance: 5200, color: '#10B981' },
-      { accountId: '2', accountName: 'Savings', accountType: 'bank', balance: 4500, color: '#3B82F6' },
-      { accountId: '3', accountName: 'Cash', accountType: 'cash', balance: 750, color: '#F59E0B' },
-      { accountId: '4', accountName: 'Crypto', accountType: 'crypto', balance: 2000, color: '#8B5CF6' },
-    ],
+    assets: 10450,
+    liabilities: 0,
+    byAccount: demoAccounts.map(a => ({
+      accountId: a.id,
+      accountName: a.name,
+      accountType: a.type,
+      balance: a.balance,
+      currency: a.currency,
+      color: a.color,
+    })),
   };
 
   const demoMonthlyFlow: MonthlyCashFlow = {
@@ -164,87 +266,84 @@ export function useDemoData(): DashboardData {
     savings: 1400,
     savingsRate: 33.3,
     byCategory: [
-      { category: 'Food & Dining', icon: '🍔', color: '#F59E0B', amount: 650, percentage: 23.2, transactions: 24 },
-      { category: 'Transport', icon: '🚗', color: '#3B82F6', amount: 450, percentage: 16.1, transactions: 8 },
-      { category: 'Shopping', icon: '🛍️', color: '#EC4899', amount: 380, percentage: 13.6, transactions: 12 },
-      { category: 'Bills & Utilities', icon: '📱', color: '#EF4444', amount: 520, percentage: 18.6, transactions: 5 },
-      { category: 'Entertainment', icon: '🎬', color: '#8B5CF6', amount: 280, percentage: 10.0, transactions: 6 },
+      { categoryId: '1', category: 'Food & Dining', icon: '🍔', color: '#F59E0B', amount: 650, percentage: 23.2, transactionCount: 24 },
+      { categoryId: '2', category: 'Transport', icon: '🚗', color: '#3B82F6', amount: 450, percentage: 16.1, transactionCount: 8 },
+      { categoryId: '3', category: 'Shopping', icon: '🛍️', color: '#EC4899', amount: 380, percentage: 13.6, transactionCount: 12 },
+      { categoryId: '4', category: 'Bills & Utilities', icon: '📱', color: '#EF4444', amount: 520, percentage: 18.6, transactionCount: 5 },
+      { categoryId: '5', category: 'Entertainment', icon: '🎬', color: '#8B5CF6', amount: 280, percentage: 10.0, transactionCount: 6 },
     ],
   };
 
   const demoTransactions: Transaction[] = [
     {
       id: '1',
-      type: 'EXPENSE',
-      amount: 45.20,
-      description: 'Grocery Store',
-      date: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2 hours ago
-      category: 'Groceries',
-      categoryIcon: '🛒',
+      userId: 'demo',
       accountId: '1',
-      accountName: 'Main Checking',
-      isRecurring: false,
+      type: 'EXPENSE',
       status: 'COMPLETED',
-      createdAt: new Date(),
+      amount: 45.20,
+      currency: 'USD',
+      description: 'Grocery Store',
+      categoryId: 'groceries',
+      date: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     },
     {
       id: '2',
-      type: 'INCOME',
-      amount: 3200.00,
-      description: 'Monthly Salary',
-      date: new Date(Date.now() - 1000 * 60 * 60 * 24), // 1 day ago
-      category: 'Salary',
-      categoryIcon: '💼',
+      userId: 'demo',
       accountId: '1',
-      accountName: 'Main Checking',
-      isRecurring: true,
-      recurringInterval: 'MONTHLY',
+      type: 'INCOME',
       status: 'COMPLETED',
-      createdAt: new Date(),
+      amount: 3200.00,
+      currency: 'USD',
+      description: 'Monthly Salary',
+      categoryId: 'salary',
+      date: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     },
     {
       id: '3',
-      type: 'EXPENSE',
-      amount: 4.50,
-      description: 'Coffee Shop',
-      date: new Date(Date.now() - 1000 * 60 * 60 * 4), // 4 hours ago
-      category: 'Food & Dining',
-      categoryIcon: '☕',
+      userId: 'demo',
       accountId: '1',
-      accountName: 'Main Checking',
-      isRecurring: false,
+      type: 'EXPENSE',
       status: 'COMPLETED',
-      createdAt: new Date(),
+      amount: 4.50,
+      currency: 'USD',
+      description: 'Coffee Shop',
+      categoryId: 'food',
+      date: new Date(Date.now() - 1000 * 60 * 60 * 4).toISOString(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     },
     {
       id: '4',
-      type: 'EXPENSE',
-      amount: 120.00,
-      description: 'Electric Bill',
-      date: new Date(Date.now() - 1000 * 60 * 60 * 48), // 2 days ago
-      category: 'Bills & Utilities',
-      categoryIcon: '⚡',
+      userId: 'demo',
       accountId: '1',
-      accountName: 'Main Checking',
-      isRecurring: true,
-      recurringInterval: 'MONTHLY',
+      type: 'EXPENSE',
       status: 'COMPLETED',
-      createdAt: new Date(),
+      amount: 120.00,
+      currency: 'USD',
+      description: 'Electric Bill',
+      categoryId: 'bills',
+      date: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     },
     {
       id: '5',
-      type: 'EXPENSE',
-      amount: 35.99,
-      description: 'Netflix Subscription',
-      date: new Date(Date.now() - 1000 * 60 * 60 * 72), // 3 days ago
-      category: 'Subscriptions',
-      categoryIcon: '📺',
+      userId: 'demo',
       accountId: '1',
-      accountName: 'Main Checking',
-      isRecurring: true,
-      recurringInterval: 'MONTHLY',
+      type: 'EXPENSE',
       status: 'COMPLETED',
-      createdAt: new Date(),
+      amount: 35.99,
+      currency: 'USD',
+      description: 'Netflix Subscription',
+      categoryId: 'subscriptions',
+      date: new Date(Date.now() - 1000 * 60 * 60 * 72).toISOString(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     },
   ];
 
@@ -252,16 +351,7 @@ export function useDemoData(): DashboardData {
     netWorth: demoNetWorth,
     monthlyFlow: demoMonthlyFlow,
     recentTransactions: demoTransactions,
-    accounts: demoNetWorth.byAccount.map(a => ({
-      id: a.accountId,
-      name: a.accountName,
-      type: a.accountType,
-      balance: a.balance,
-      currency: 'USD',
-      isDefault: a.accountId === '1',
-      lastUpdated: new Date(),
-      createdAt: new Date(),
-    })),
+    accounts: demoAccounts,
     isLoading: false,
     refresh: async () => {},
   };

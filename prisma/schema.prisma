@@ -1,12 +1,8 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+// TrackWise Finance App - Production-Ready Schema v2.0
+// Optimized for: accurate money handling, multi-currency, recurring transactions, analytics
 
 generator client {
   provider = "prisma-client-js"
-  output   = "../node_modules/.prisma/client"
 }
 
 datasource db {
@@ -15,113 +11,415 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+// ============================================
+// USER & AUTHENTICATION
+// ============================================
+
 model User {
-  id                String             @id @default(uuid())
-  googleId          String?            @unique
-  email             String             @unique
-  name              String?
-  image             String?
-  emailVerified     DateTime?          // Added for NextAuth compatibility
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  image         String?
+  emailVerified DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
   accounts          Account[]
+  preferences       UserPreferences?
   financialAccounts FinancialAccount[]
   transactions      Transaction[]
+  categories        Category[]
   budgets           Budget[]
+  recurringRules    RecurringRule[]
+  netWorthSnapshots NetWorthSnapshot[]
 
   @@map("users")
 }
 
+model UserPreferences {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Currency & Locale
+  defaultCurrency String @default("USD")
+  locale          String @default("en-US")
+  timezone        String @default("UTC")
+
+  // Display preferences
+  theme       String @default("system")
+  accentColor String @default("#10B981")
+
+  // Notification preferences
+  emailNotifications Boolean @default(true)
+  budgetAlerts       Boolean @default(true)
+  weeklyDigest       Boolean @default(false)
+
+  // Onboarding
+  hasCompletedOnboarding Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("user_preferences")
+}
+
+// NextAuth Account (OAuth providers) - Must be named "Account" for NextAuth adapter
 model Account {
-  id                String        @id @default(uuid())
+  id                String  @id @default(cuid())
   userId            String
   type              String
   provider          String
   providerAccountId String
-  refresh_token     String?       @db.Text
-  access_token      String?       @db.Text
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
   expires_at        Int?
   token_type        String?
   scope             String?
-  id_token          String?       @db.Text
+  id_token          String? @db.Text
   session_state     String?
-  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
 
-  @@unique([provider, providerAccountId], name: "provider_providerAccountId")
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([provider, providerAccountId])
   @@index([userId])
   @@map("accounts")
 }
 
-// Financial account model for tracking finances
-model FinancialAccount {
-  id           String        @id @default(uuid())
-  name         String
-  balance      Decimal       @default(0)
-  isDefault    Boolean       @default(false)
-  userId       String
-  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  transactions Transaction[]
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+// ============================================
+// FINANCIAL ACCOUNTS
+// ============================================
 
-  @@index([userId])
+model FinancialAccount {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Account details
+  name        String
+  type        AccountType   @default(CHECKING)
+  institution String?
+
+  // Money - stored as integer minor units (cents) to avoid floating point
+  // Example: 1000 = $10.00, supports up to ~92 quadrillion cents
+  balance  BigInt @default(0)
+  currency String @default("USD")
+
+  // Display
+  icon  String?
+  color String?
+
+  // Status
+  status    AccountStatus @default(ACTIVE)
+  isDefault Boolean       @default(false)
+  sortOrder Int           @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  transactions Transaction[]
+
+  @@unique([userId, name])
+  @@index([userId, status])
+  @@index([userId, type])
   @@map("financial_accounts")
 }
 
-model Transaction {
-  id                String             @id @default(uuid())
-  type              TransactionType
-  amount            Decimal
-  description       String?
-  date              DateTime
-  category          String
-  receiptUrl        String?
-  isRecurring       Boolean            @default(false)
-  recurringInterval RecurringInterval? // Only if isRecurring is true
-  nextRecurringDate DateTime? // Next date of the recurring transaction
-  lastProcessedDate DateTime? // Last date the transaction was processed
-  status            TransactionStatus  @default(COMPLETED)
-  userId            String
-  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  accountId         String
-  account           FinancialAccount   @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
-
-  @@index([userId])
-  @@index([accountId])
-  @@map("transactions")
+enum AccountType {
+  CHECKING
+  SAVINGS
+  CREDIT_CARD
+  CASH
+  INVESTMENT
+  CRYPTO
+  LOAN
+  OTHER
 }
 
-model Budget {
-  id            String    @id @default(uuid())
-  amount        Decimal
-  lastAlertSent DateTime? // Last date the alert was sent
-  userId        String
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+enum AccountStatus {
+  ACTIVE
+  ARCHIVED
+  CLOSED
+}
 
-  @@index([userId])
-  @@map("budgets")
+// ============================================
+// CATEGORIES
+// ============================================
+
+model Category {
+  id     String  @id @default(cuid())
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Category details
+  name  String
+  icon  String
+  color String?
+  type  TransactionType
+
+  // Hierarchy support
+  parentId String?
+  parent   Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryHierarchy")
+
+  // System vs Custom
+  isSystem Boolean @default(false)
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  transactions Transaction[]
+  budgets      Budget[]
+
+  @@unique([userId, name, type])
+  @@index([userId, type, isActive])
+  @@index([isSystem])
+  @@map("categories")
+}
+
+// ============================================
+// TRANSACTIONS
+// ============================================
+
+model Transaction {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accountId String
+  account   FinancialAccount @relation(fields: [accountId], references: [id], onDelete: Restrict)
+
+  // Transaction details
+  type   TransactionType
+  status TransactionStatus @default(COMPLETED)
+
+  // Money - stored in minor units (cents)
+  amount   BigInt
+  currency String
+
+  // Metadata
+  description String?
+  categoryId  String
+  category    Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  notes       String?  @db.Text
+
+  // Date tracking
+  date       DateTime
+  postedDate DateTime?
+
+  // Attachments
+  receiptUrl String?
+
+  // Recurring link
+  recurringRuleId String?
+  recurringRule   RecurringRule? @relation(fields: [recurringRuleId], references: [id], onDelete: SetNull)
+
+  // For transfers between accounts
+  transferPairId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Critical indexes for dashboard performance
+  @@index([userId, date])
+  @@index([userId, type, date])
+  @@index([userId, categoryId, date])
+  @@index([accountId, date])
+  @@index([recurringRuleId])
+  @@index([transferPairId])
+  @@index([status])
+  @@map("transactions")
 }
 
 enum TransactionType {
   INCOME
   EXPENSE
-}
-
-enum RecurringInterval {
-  DAILY
-  WEEKLY
-  MONTHLY
-  YEARLY
+  TRANSFER
 }
 
 enum TransactionStatus {
   PENDING
   COMPLETED
+  CANCELLED
   FAILED
+}
+
+// ============================================
+// RECURRING TRANSACTIONS (Templates)
+// ============================================
+
+model RecurringRule {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Rule identification
+  name String
+
+  // Template transaction data
+  type        TransactionType
+  amount      BigInt
+  currency    String
+  description String?
+  categoryId  String
+  accountId   String
+
+  // Recurrence pattern
+  frequency   RecurringFrequency
+  interval    Int                @default(1)
+  dayOfMonth  Int?
+  dayOfWeek   Int?
+  monthOfYear Int?
+
+  // Schedule bounds
+  startDate      DateTime
+  endDate        DateTime?
+  maxOccurrences Int?
+
+  // Tracking
+  occurrenceCount Int       @default(0)
+  nextOccurrence  DateTime?
+  lastOccurrence  DateTime?
+  lastProcessedAt DateTime?
+
+  // Status
+  status RecurringStatus @default(ACTIVE)
+
+  // Auto-create or need approval?
+  autoPost Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Generated transactions
+  transactions Transaction[]
+
+  @@index([userId, status])
+  @@index([nextOccurrence, status])
+  @@index([status, nextOccurrence])
+  @@map("recurring_rules")
+}
+
+enum RecurringFrequency {
+  DAILY
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+enum RecurringStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
+// ============================================
+// BUDGETS
+// ============================================
+
+model Budget {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // What is being budgeted
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  name String
+
+  // Budget amount in minor units
+  amount   BigInt
+  currency String
+
+  // Period
+  period    BudgetPeriod
+  startDate DateTime
+  endDate   DateTime?
+
+  // Cached spent amount (updated by trigger/cron)
+  spent            BigInt   @default(0)
+  lastCalculatedAt DateTime @default(now())
+
+  // Alerts
+  alertThreshold  Int       @default(80)
+  lastAlertSentAt DateTime?
+
+  // Status
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, categoryId, period, startDate])
+  @@index([userId, isActive])
+  @@index([userId, period, startDate])
+  @@map("budgets")
+}
+
+enum BudgetPeriod {
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
+  QUARTERLY
+  YEARLY
+  CUSTOM
+}
+
+// ============================================
+// ANALYTICS & HISTORY
+// ============================================
+
+model NetWorthSnapshot {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Snapshot date
+  date DateTime
+
+  // Totals in user's default currency
+  totalAssets      BigInt
+  totalLiabilities BigInt
+  netWorth         BigInt
+  currency         String
+
+  // Breakdown by account type (JSON)
+  accountBreakdown Json?
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, date])
+  @@index([userId, date])
+  @@map("net_worth_snapshots")
+}
+
+// ============================================
+// EXCHANGE RATES (for multi-currency)
+// ============================================
+
+model ExchangeRate {
+  id String @id @default(cuid())
+
+  fromCurrency  String
+  toCurrency    String
+  rate          Decimal  @db.Decimal(18, 8)
+  effectiveDate DateTime
+  source        String?
+
+  createdAt DateTime @default(now())
+
+  @@unique([fromCurrency, toCurrency, effectiveDate])
+  @@index([fromCurrency, toCurrency, effectiveDate])
+  @@map("exchange_rates")
 }

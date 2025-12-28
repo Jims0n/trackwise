@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/auth';
 import { db } from '@/lib/prisma';
+import { fromMinorUnits } from '@/types';
 
 export async function GET(request: Request) {
   try {
@@ -29,24 +30,32 @@ export async function GET(request: Request) {
           select: {
             id: true,
             name: true,
+            currency: true,
           },
         },
+        category: true,
       },
     });
 
     // Serialize the data
     const serializedTransactions = transactions.map((t) => ({
       id: t.id,
-      type: t.type,
-      amount: Number(t.amount),
-      description: t.description,
-      date: t.date.toISOString(),
-      category: t.category,
+      userId: t.userId,
       accountId: t.accountId,
-      accountName: t.account.name,
-      isRecurring: t.isRecurring,
-      recurringInterval: t.recurringInterval,
+      type: t.type,
       status: t.status,
+      amount: fromMinorUnits(t.amount),
+      currency: t.currency,
+      description: t.description,
+      categoryId: t.categoryId,
+      category: t.category ? {
+        id: t.category.id,
+        name: t.category.name,
+        icon: t.category.icon,
+        color: t.category.color,
+        type: t.category.type,
+      } : undefined,
+      date: t.date.toISOString(),
       createdAt: t.createdAt.toISOString(),
       updatedAt: t.updatedAt.toISOString(),
     }));

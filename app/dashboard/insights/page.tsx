@@ -129,7 +129,7 @@ export default function InsightsPage() {
                     icon={cat.icon}
                     amount={cat.amount}
                     percentage={cat.percentage}
-                    transactions={cat.transactions}
+                    transactions={cat.transactionCount}
                     currencySymbol={currencySymbol}
                     delay={index * 0.1}
                   />
