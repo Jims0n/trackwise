@@ -40,7 +40,7 @@ const modalVariants = {
 };
 
 export function AddTransactionModal() {
-  const { isAddModalOpen, addModalType, closeAddModal, currencySymbol } = useUIStore();
+  const { isAddModalOpen, addModalType, closeAddModal, currencySymbol, triggerDataRefresh } = useUIStore();
   const { accounts: storeAccounts, addTransaction, setAccounts } = useFinanceStore();
   
   // Local accounts state (in case store is empty)
@@ -125,11 +125,17 @@ export function AddTransactionModal() {
     setIsSubmitting(true);
     
     try {
+      // For today's date, use current timestamp; for other dates, parse with local timezone
+      const today = new Date().toISOString().split('T')[0];
+      const transactionDate = date === today 
+        ? new Date() // Use current timestamp for today
+        : new Date(date + 'T12:00:00'); // Use noon local time for other dates
+      
       const result = await createTransaction({
         type: type as 'INCOME' | 'EXPENSE',
         amount: parseFloat(amount),
         description: description || undefined,
-        date: new Date(date),
+        date: transactionDate,
         categoryId: category.id,
         accountId: selectedAccountId,
       });
@@ -138,6 +144,7 @@ export function AddTransactionModal() {
         toast.error(result.error);
       } else {
         toast.success(`${type === 'INCOME' ? 'Income' : 'Expense'} added successfully!`);
+        triggerDataRefresh(); // Refresh dashboard data
         closeAddModal();
       }
     } catch (error) {

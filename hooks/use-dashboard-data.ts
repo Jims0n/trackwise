@@ -10,6 +10,7 @@ import type {
   CategorySummary
 } from '@/types';
 import { useFinanceStore } from '@/stores/finance-store';
+import { useUIStore } from '@/stores/ui-store';
 
 // Simple in-memory store for dashboard data
 interface DashboardData {
@@ -29,6 +30,9 @@ export function useDashboardData(): DashboardData {
   
   // Get store actions to sync data globally
   const { setAccounts: setStoreAccounts, setTransactions: setStoreTransactions } = useFinanceStore();
+  
+  // Watch for data refresh triggers
+  const { dataRefreshKey } = useUIStore();
 
   // Fetch data from API
   const fetchData = useCallback(async () => {
@@ -61,12 +65,10 @@ export function useDashboardData(): DashboardData {
     }
   }, [setStoreAccounts, setStoreTransactions]);
 
-  // Initial fetch
+  // Initial fetch and refresh when dataRefreshKey changes
   useEffect(() => {
-    if (!isInitialized) {
-      fetchData();
-    }
-  }, [isInitialized, fetchData]);
+    fetchData();
+  }, [fetchData, dataRefreshKey]);
 
   // Compute net worth from accounts
   const netWorth: NetWorth | null = accounts.length > 0 ? computeNetWorth(accounts) : null;

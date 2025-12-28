@@ -40,6 +40,9 @@ interface UIState {
   // Onboarding
   hasCompletedOnboarding: boolean;
   
+  // Data refresh trigger
+  dataRefreshKey: number;
+  
   // Actions
   setTheme: (theme: 'light' | 'dark' | 'system') => void;
   setAccentColor: (color: string) => void;
@@ -55,6 +58,9 @@ interface UIState {
   setActiveTab: (tab: UIState['activeTab']) => void;
   
   completeOnboarding: () => void;
+  
+  // Trigger data refresh across app
+  triggerDataRefresh: () => void;
 }
 
 export const useUIStore = create<UIState>()(
@@ -72,6 +78,7 @@ export const useUIStore = create<UIState>()(
       selectedAccountId: null,
       activeTab: 'home',
       hasCompletedOnboarding: false,
+      dataRefreshKey: 0,
       
       // Theme actions
       setTheme: (theme) => set({ theme }),
@@ -105,6 +112,9 @@ export const useUIStore = create<UIState>()(
       
       // Onboarding actions
       completeOnboarding: () => set({ hasCompletedOnboarding: true }),
+      
+      // Data refresh
+      triggerDataRefresh: () => set((state) => ({ dataRefreshKey: state.dataRefreshKey + 1 })),
     }),
     {
       name: 'trackwise-ui',
