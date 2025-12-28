@@ -31,13 +31,6 @@ export function QuickActions() {
       color: 'expense',
       action: () => openAddModal('EXPENSE'),
     },
-    {
-      id: 'transfer',
-      label: 'Transfer',
-      icon: ArrowLeftRight,
-      color: 'transfer',
-      action: () => openAddModal('TRANSFER'),
-    },
   ];
 
   const colorClasses = {
