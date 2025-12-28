@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/auth';
 import { db } from '@/lib/prisma';
+import { fromMinorUnits } from '@/types';
 
 export async function GET() {
   try {
@@ -13,15 +14,26 @@ export async function GET() {
 
     const accounts = await db.financialAccount.findMany({
       where: { userId: session.user.id },
-      orderBy: { createdAt: 'desc' },
+      orderBy: [
+        { sortOrder: 'asc' },
+        { createdAt: 'desc' },
+      ],
     });
 
-    // Serialize the data
+    // Serialize the data with all fields and proper balance conversion
     const serializedAccounts = accounts.map((account) => ({
       id: account.id,
+      userId: account.userId,
       name: account.name,
-      balance: Number(account.balance),
+      type: account.type,
+      institution: account.institution,
+      balance: fromMinorUnits(account.balance), // Convert from cents to display amount
+      currency: account.currency,
+      icon: account.icon,
+      color: account.color,
+      status: account.status,
       isDefault: account.isDefault,
+      sortOrder: account.sortOrder,
       createdAt: account.createdAt.toISOString(),
       updatedAt: account.updatedAt.toISOString(),
     }));

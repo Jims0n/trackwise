@@ -3,8 +3,8 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Wallet, CreditCard, Landmark, Bitcoin, PiggyBank, ChevronRight, X } from "lucide-react";
-import { getFinancialAccounts, createFinancialAccount } from "@/app/actions/financial-account";
+import { Plus, Wallet, CreditCard, Landmark, Bitcoin, PiggyBank, ChevronRight, X, Trash2, MoreVertical, Pencil } from "lucide-react";
+import { getFinancialAccounts, createFinancialAccount, deleteFinancialAccount, updateFinancialAccount } from "@/app/actions/financial-account";
 import { toast } from "sonner";
 import { useUIStore } from "@/stores/ui-store";
 import { cn } from "@/lib/utils";
@@ -114,6 +114,7 @@ export default function AccountsPage() {
                 account={account}
                 color={accountColors[index % accountColors.length]}
                 onClick={() => handleAccountClick(account.id)}
+                onDelete={loadAccounts}
                 currencySymbol={currencySymbol}
               />
             </StaggerItem>
@@ -138,40 +139,108 @@ function AccountCard({
   account,
   color,
   onClick,
+  onDelete,
   currencySymbol,
 }: {
   account: FinancialAccount;
   color: string;
   onClick: () => void;
+  onDelete: () => void;
   currencySymbol: string;
 }) {
+  const [showMenu, setShowMenu] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDelete = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowMenu(false);
+    
+    if (!confirm(`Are you sure you want to delete "${account.name}"?`)) {
+      return;
+    }
+    
+    setIsDeleting(true);
+    const result = await deleteFinancialAccount(account.id);
+    setIsDeleting(false);
+    
+    if (result.error) {
+      toast.error(result.error);
+    } else {
+      toast.success('Account deleted');
+      onDelete();
+    }
+  };
+
   return (
-    <motion.button
-      whileTap={{ scale: 0.98 }}
-      onClick={onClick}
-      className="w-full card card-interactive p-4"
+    <motion.div
+      className={cn("relative w-full card card-interactive p-4", isDeleting && "opacity-50")}
     >
-      <div className="flex items-center gap-4">
-        <div 
-          className="w-12 h-12 rounded-2xl flex items-center justify-center"
-          style={{ backgroundColor: `${color}20` }}
-        >
-          <Wallet className="w-6 h-6" style={{ color }} />
+      <motion.button
+        whileTap={{ scale: 0.98 }}
+        onClick={onClick}
+        className="w-full"
+        disabled={isDeleting}
+      >
+        <div className="flex items-center gap-4">
+          <div 
+            className="w-12 h-12 rounded-2xl flex items-center justify-center"
+            style={{ backgroundColor: `${color}20` }}
+          >
+            <Wallet className="w-6 h-6" style={{ color }} />
+          </div>
+          <div className="flex-1 text-left">
+            <p className="font-semibold text-[rgb(var(--foreground))]">{account.name}</p>
+            <p className="text-sm text-[rgb(var(--foreground-muted))]">
+              {account.isDefault ? 'Default Account' : 'Account'}
+            </p>
+          </div>
+          <div className="text-right mr-2">
+            <p className="font-semibold text-lg tabular-nums" style={{ color }}>
+              {currencySymbol}{account.balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+            </p>
+          </div>
+          <ChevronRight className="w-5 h-5 text-[rgb(var(--foreground-muted))]" />
         </div>
-        <div className="flex-1 text-left">
-          <p className="font-semibold text-[rgb(var(--foreground))]">{account.name}</p>
-          <p className="text-sm text-[rgb(var(--foreground-muted))]">
-            {account.isDefault ? 'Default Account' : 'Account'}
-          </p>
-        </div>
-        <div className="text-right">
-          <p className="font-semibold text-lg tabular-nums" style={{ color }}>
-            {currencySymbol}{account.balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-          </p>
-        </div>
-        <ChevronRight className="w-5 h-5 text-[rgb(var(--foreground-muted))]" />
-      </div>
-    </motion.button>
+      </motion.button>
+      
+      {/* Menu Button */}
+      <motion.button
+        whileTap={{ scale: 0.9 }}
+        onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }}
+        className="absolute top-3 right-3 p-2 rounded-xl hover:bg-[rgb(var(--background-secondary))] z-10"
+      >
+        <MoreVertical className="w-4 h-4 text-[rgb(var(--foreground-muted))]" />
+      </motion.button>
+      
+      {/* Dropdown Menu */}
+      <AnimatePresence>
+        {showMenu && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowMenu(false)}
+              className="fixed inset-0 z-20"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: -10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: -10 }}
+              className="absolute top-12 right-3 z-30 bg-[rgb(var(--card))] rounded-xl shadow-lg border border-[rgb(var(--border))] overflow-hidden min-w-[140px]"
+            >
+              <button
+                onClick={handleDelete}
+                className="w-full flex items-center gap-2 px-4 py-3 text-left text-[rgb(var(--expense))] hover:bg-[rgb(var(--background-secondary))] transition-colors"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span className="text-sm font-medium">Delete</span>
+              </button>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 }
 
@@ -224,7 +293,7 @@ function AddAccountModal({
   const [accountType, setAccountType] = useState<typeof ACCOUNT_TYPES[number]['value']>('CHECKING');
   const [isDefault, setIsDefault] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { currencySymbol, currency } = useUIStore();
+  const { currencySymbol, currency, triggerDataRefresh } = useUIStore();
 
   const handleSubmit = async () => {
     if (!name.trim()) {
@@ -250,6 +319,7 @@ function AddAccountModal({
         setBalance('');
         setAccountType('CHECKING');
         setIsDefault(false);
+        triggerDataRefresh(); // Refresh dashboard data
         onSuccess();
       }
     } catch (error) {

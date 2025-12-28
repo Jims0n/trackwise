@@ -218,6 +218,43 @@ export async function archiveFinancialAccount(accountId: string) {
   }
 }
 
+export async function deleteFinancialAccount(accountId: string) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return { error: "You must be logged in" };
+    }
+    
+    // Check if account has transactions
+    const transactionCount = await db.transaction.count({
+      where: { accountId, userId: session.user.id },
+    });
+    
+    if (transactionCount > 0) {
+      return { 
+        error: `Cannot delete account with ${transactionCount} transaction${transactionCount > 1 ? 's' : ''}. Archive it instead or delete transactions first.` 
+      };
+    }
+    
+    // Delete the account
+    const deleted = await db.financialAccount.deleteMany({
+      where: { id: accountId, userId: session.user.id },
+    });
+    
+    if (deleted.count === 0) {
+      return { error: "Account not found" };
+    }
+    
+    revalidatePath("/dashboard");
+    revalidatePath("/dashboard/accounts");
+    
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to delete account:", error);
+    return { error: "Failed to delete account" };
+  }
+}
+
 export async function getTotalBalance() {
   try {
     const session = await getServerSession(authOptions);

@@ -4,23 +4,63 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { TrendingUp, TrendingDown, PieChart, BarChart3, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
 import { useUIStore } from "@/stores/ui-store";
-import { useDemoData } from "@/hooks/use-dashboard-data";
+import { useDashboardData } from "@/hooks/use-dashboard-data";
 import { cn } from "@/lib/utils";
 import { PageContainer, StaggerContainer, StaggerItem } from "@/components/layout/page-container";
 import { PageHeader } from "@/components/layout/header";
+import { getTransactionStats } from "@/app/actions/transaction";
 
 type TimeRange = 'week' | 'month' | 'year';
 
 export default function InsightsPage() {
   const [timeRange, setTimeRange] = useState<TimeRange>('month');
   const { currencySymbol } = useUIStore();
-  const { monthlyFlow, recentTransactions } = useDemoData();
+  const { monthlyFlow, isLoading } = useDashboardData();
+  
+  // Loading state for stats
+  const [isLoadingStats, setIsLoadingStats] = useState(true);
+  
+  // Stats from real data
+  const [stats, setStats] = useState<{
+    income: number;
+    expenses: number;
+    savings: number;
+    savingsRate: number;
+    byCategory: Array<{
+      categoryId: string;
+      category: string;
+      icon: string;
+      color: string;
+      amount: number;
+      percentage: number;
+      transactionCount: number;
+    }>;
+  } | null>(null);
+  
+  // Fetch stats when time range changes
+  useEffect(() => {
+    async function loadStats() {
+      setIsLoadingStats(true);
+      const result = await getTransactionStats(timeRange);
+      if (!result.error) {
+        setStats({
+          income: result.income || 0,
+          expenses: result.expenses || 0,
+          savings: result.savings || 0,
+          savingsRate: result.savingsRate || 0,
+          byCategory: result.byCategory || [],
+        });
+      }
+      setIsLoadingStats(false);
+    }
+    loadStats();
+  }, [timeRange]);
 
-  // Calculate spending by category
-  const categorySpending = monthlyFlow?.byCategory || [];
-  const totalExpenses = monthlyFlow?.expenses || 0;
-  const totalIncome = monthlyFlow?.income || 0;
-  const savingsRate = monthlyFlow?.savingsRate || 0;
+  // Use fetched stats or fall back to monthlyFlow
+  const categorySpending = stats?.byCategory || monthlyFlow?.byCategory || [];
+  const totalExpenses = stats?.expenses ?? monthlyFlow?.expenses ?? 0;
+  const totalIncome = stats?.income ?? monthlyFlow?.income ?? 0;
+  const savingsRate = stats?.savingsRate ?? monthlyFlow?.savingsRate ?? 0;
 
   return (
     <PageContainer>
@@ -167,37 +207,34 @@ export default function InsightsPage() {
           </motion.div>
         </StaggerItem>
 
-        {/* Top Merchants (placeholder) */}
-        <StaggerItem>
-          <motion.div className="card p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-title">Top Merchants</h3>
-              <span className="text-caption">This month</span>
-            </div>
-            
-            <div className="space-y-3">
-              {[
-                { name: 'Grocery Store', amount: 245.50, count: 8 },
-                { name: 'Amazon', amount: 189.99, count: 5 },
-                { name: 'Coffee Shop', amount: 67.80, count: 14 },
-                { name: 'Gas Station', amount: 156.00, count: 4 },
-              ].map((merchant, index) => (
-                <div key={merchant.name} className="flex items-center gap-3">
-                  <span className="text-micro w-6">{index + 1}</span>
-                  <div className="flex-1">
-                    <p className="font-medium">{merchant.name}</p>
-                    <p className="text-xs text-[rgb(var(--foreground-muted))]">
-                      {merchant.count} transactions
+        {/* Top Spending Categories Summary */}
+        {categorySpending.length > 0 && (
+          <StaggerItem>
+            <motion.div className="card p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-title">Top Spending</h3>
+                <span className="text-caption capitalize">{timeRange === 'month' ? 'This month' : timeRange === 'week' ? 'This week' : 'This year'}</span>
+              </div>
+              
+              <div className="space-y-3">
+                {categorySpending.slice(0, 4).map((cat, index) => (
+                  <div key={cat.categoryId} className="flex items-center gap-3">
+                    <span className="text-lg">{cat.icon}</span>
+                    <div className="flex-1">
+                      <p className="font-medium">{cat.category}</p>
+                      <p className="text-xs text-[rgb(var(--foreground-muted))]">
+                        {cat.transactionCount} transaction{cat.transactionCount !== 1 ? 's' : ''}
+                      </p>
+                    </div>
+                    <p className="font-semibold tabular-nums">
+                      {currencySymbol}{cat.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </p>
                   </div>
-                  <p className="font-semibold tabular-nums">
-                    {currencySymbol}{merchant.amount.toFixed(2)}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </motion.div>
-        </StaggerItem>
+                ))}
+              </div>
+            </motion.div>
+          </StaggerItem>
+        )}
       </StaggerContainer>
     </PageContainer>
   );
