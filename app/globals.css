@@ -3,12 +3,232 @@
 
 
 :root {
-  --bg: #272727;
-  --text: #f5f5f5;
+  /* Background */
+  --background: 250 250 250;
+  --background-secondary: 244 244 245;
+  --card: 255 255 255;
+  --card-hover: 250 250 250;
+  
+  /* Text */
+  --foreground: 9 9 11;
+  --foreground-secondary: 113 113 122;
+  --foreground-muted: 161 161 170;
+  
+  /* Brand Colors */
+  --primary: 16 185 129;        /* Emerald - money/success */
+  --primary-foreground: 255 255 255;
+  --secondary: 99 102 241;      /* Indigo - accent */
+  --secondary-foreground: 255 255 255;
+  
+  /* Semantic Colors */
+  --income: 16 185 129;         /* Green */
+  --expense: 244 63 94;         /* Rose */
+  --transfer: 99 102 241;       /* Indigo */
+  --savings: 59 130 246;        /* Blue */
+  
+  /* UI Elements */
+  --border: 228 228 231;
+  --border-secondary: 244 244 245;
+  --ring: 16 185 129;
+  --radius: 16px;
+  --radius-sm: 12px;
+  --radius-lg: 24px;
+  
+  /* Shadows */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.03);
+  --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.05), 0 1px 2px -1px rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.05), 0 4px 6px -4px rgb(0 0 0 / 0.05);
 }
+
+.dark {
+  --background: 10 10 10;
+  --background-secondary: 20 20 20;
+  --card: 20 20 20;
+  --card-hover: 30 30 30;
+  
+  --foreground: 250 250 250;
+  --foreground-secondary: 161 161 170;
+  --foreground-muted: 113 113 122;
+  
+  --border: 39 39 42;
+  --border-secondary: 30 30 30;
+  
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.2);
+  --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.3), 0 1px 2px -1px rgb(0 0 0 / 0.3);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.3), 0 2px 4px -2px rgb(0 0 0 / 0.3);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.3), 0 4px 6px -4px rgb(0 0 0 / 0.3);
+}
+
+* {
+  border-color: rgb(var(--border));
+}
+
 body {
   margin: 0;
-  background-color: var(--bg);
-  color: var(--text);
-  font-family: var(--font-instrument), sans-serif;
+  background-color: rgb(var(--background));
+  color: rgb(var(--foreground));
+  font-family: var(--font-instrument), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "cv11", "ss01";
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgb(var(--border));
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--foreground-muted));
+}
+
+/* Typography scale */
+.text-display {
+  font-size: 3rem;
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.text-headline {
+  font-size: 1.875rem;
+  line-height: 1.2;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.text-title {
+  font-size: 1.25rem;
+  line-height: 1.4;
+  font-weight: 600;
+}
+
+.text-body {
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.text-caption {
+  font-size: 0.875rem;
+  line-height: 1.4;
+  color: rgb(var(--foreground-secondary));
+}
+
+.text-micro {
+  font-size: 0.75rem;
+  line-height: 1.3;
+  color: rgb(var(--foreground-muted));
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 500;
+}
+
+/* Glass effect */
+.glass {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.dark .glass {
+  background: rgba(20, 20, 20, 0.8);
+}
+
+/* Gradient text */
+.gradient-text {
+  background: linear-gradient(135deg, rgb(var(--primary)) 0%, rgb(var(--secondary)) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Card styles */
+.card {
+  background: rgb(var(--card));
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  border: 1px solid rgb(var(--border) / 0.5);
+}
+
+.card-interactive {
+  transition: all 0.2s ease;
+}
+
+.card-interactive:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+.card-interactive:active {
+  transform: translateY(0);
+}
+
+/* Safe area for mobile */
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.safe-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+/* Number formatting */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Animations */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slide-up {
+  from { 
+    opacity: 0; 
+    transform: translateY(10px); 
+  }
+  to { 
+    opacity: 1; 
+    transform: translateY(0); 
+  }
+}
+
+@keyframes scale-in {
+  from { 
+    opacity: 0; 
+    transform: scale(0.95); 
+  }
+  to { 
+    opacity: 1; 
+    transform: scale(1); 
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out;
+}
+
+.animate-slide-up {
+  animation: slide-up 0.4s ease-out;
+}
+
+.animate-scale-in {
+  animation: scale-in 0.3s ease-out;
 }

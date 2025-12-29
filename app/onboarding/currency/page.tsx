@@ -1,36 +1,26 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { motion, AnimatePresence } from "framer-motion";
+import { Check, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { getAvailableCurrencies } from "@/lib/currency";
-import { InstallPrompt } from "@/components/install-prompt";
+import { useUIStore } from "@/stores/ui-store";
+import { cn } from "@/lib/utils";
 
-// Import the select components directly from the file we created
-import { 
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from "@/components/ui/select";
-
-// Get currencies from our utility function
 const currencies = getAvailableCurrencies();
 
 export default function CurrencySelectionPage() {
   const [selectedCurrency, setSelectedCurrency] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+  const { setCurrency } = useUIStore();
 
-  const handleCurrencySelect = (value: string) => {
-    setSelectedCurrency(value);
-  };
+  const selectedCurrencyData = currencies.find(c => c.code === selectedCurrency);
 
   const handleNext = async () => {
-    if (!selectedCurrency) {
+    if (!selectedCurrency || !selectedCurrencyData) {
       toast.error("Please select a currency");
       return;
     }
@@ -38,76 +28,118 @@ export default function CurrencySelectionPage() {
     setIsLoading(true);
 
     try {
-      // Store the selected currency in a cookie
-      // Make sure the cookie is set with the correct attributes
-      document.cookie = `userCurrency=${selectedCurrency}; path=/; max-age=${60*60*24*365}; SameSite=Lax`; // 1 year expiry
+      // Store in cookie for server-side
+      document.cookie = `userCurrency=${selectedCurrency}; path=/; max-age=${60*60*24*365}; SameSite=Lax`;
       
-      console.log("Setting currency cookie:", selectedCurrency);
+      // Store in Zustand for client-side
+      setCurrency(selectedCurrency, selectedCurrencyData.symbol);
       
-      // Add a small delay to ensure the cookie is set before navigation
       setTimeout(() => {
-        // Navigate to the dashboard
         router.push("/dashboard");
-      }, 500);
+      }, 300);
     } catch (error) {
       toast.error("Failed to save currency preference");
       console.error(error);
-    } finally {
       setIsLoading(false);
     }
   };
 
-  const handleBack = () => {
-    router.back();
-  };
-
   return (
-    <div className="min-h-screen bg-[#1E1E1E] flex flex-col items-center justify-center p-4" 
-         style={{ backgroundImage: "linear-gradient(rgba(0, 0, 0, 0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 0, 0, 0.1) 1px, transparent 1px)", 
-                  backgroundSize: "40px 40px" }}>
-      {/* Install Prompt for iOS Safari users */}
-      <InstallPrompt />
-      
-      <Card className="w-full max-w-md bg-transparent border-0 text-white">
-        <div className="space-y-6">
-          <div className="space-y-2">
-            <h1 className="text-5xl font-bold text-white">Welcome<br />to trackwise.</h1>
-            <p className="text-xl mt-6">What is your primary currency?</p>
-          </div>
-
-          <div className="mt-6">
-            <Select onValueChange={handleCurrencySelect} value={selectedCurrency}>
-              <SelectTrigger className="w-full h-12 bg-transparent border-b border-t-0 border-x-0 rounded-none text-white focus:ring-0 focus:border-white">
-                <SelectValue placeholder="e.g. Naira" />
-              </SelectTrigger>
-              <SelectContent className="bg-[#2A2A2A] border-gray-700 text-white">
-                {currencies.map((currency) => (
-                  <SelectItem key={currency.code} value={currency.code} className="hover:bg-gray-700">
-                    {currency.name} ({currency.symbol})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2 mt-10 pt-10">
-            <Button 
-              onClick={handleNext} 
-              disabled={isLoading || !selectedCurrency}
-              className="w-full bg-[#F5F5DC] text-black hover:bg-[#E5E5C5] h-12 rounded-md font-medium"
-            >
-              {isLoading ? "Saving..." : "Next"}
-            </Button>
-            <Button 
-              onClick={handleBack} 
-              variant="outline" 
-              className="w-full bg-transparent border border-white text-white hover:bg-gray-800 h-12 rounded-md font-medium mt-2"
-            >
-              Back
-            </Button>
-          </div>
+    <div className="min-h-screen bg-[rgb(var(--background))] flex flex-col">
+      {/* Progress indicator */}
+      <div className="pt-safe px-6 py-4">
+        <div className="h-1 bg-[rgb(var(--border))] rounded-full overflow-hidden">
+          <motion.div
+            initial={{ width: 0 }}
+            animate={{ width: '50%' }}
+            className="h-full bg-[rgb(var(--primary))] rounded-full"
+          />
         </div>
-      </Card>
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 px-6 py-8">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+        >
+          <h1 className="text-headline mb-2">
+            Select your currency
+          </h1>
+          <p className="text-caption mb-8">
+            Choose your primary currency for tracking expenses
+          </p>
+
+          {/* Currency List */}
+          <div className="space-y-2">
+            {currencies.map((currency, index) => (
+              <motion.button
+                key={currency.code}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: index * 0.05 }}
+                onClick={() => setSelectedCurrency(currency.code)}
+                className={cn(
+                  'w-full flex items-center gap-4 p-4 rounded-2xl border-2 transition-all',
+                  selectedCurrency === currency.code
+                    ? 'border-[rgb(var(--primary))] bg-[rgb(var(--primary))]/10'
+                    : 'border-[rgb(var(--border))] bg-[rgb(var(--card))]'
+                )}
+              >
+                <div className={cn(
+                  'w-12 h-12 rounded-xl flex items-center justify-center text-xl font-bold',
+                  selectedCurrency === currency.code
+                    ? 'bg-[rgb(var(--primary))] text-white'
+                    : 'bg-[rgb(var(--background-secondary))]'
+                )}>
+                  {currency.symbol}
+                </div>
+                <div className="flex-1 text-left">
+                  <p className="font-semibold">{currency.name}</p>
+                  <p className="text-sm text-[rgb(var(--foreground-muted))]">{currency.code}</p>
+                </div>
+                {selectedCurrency === currency.code && (
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    className="w-6 h-6 rounded-full bg-[rgb(var(--primary))] flex items-center justify-center"
+                  >
+                    <Check className="w-4 h-4 text-white" />
+                  </motion.div>
+                )}
+              </motion.button>
+            ))}
+          </div>
+        </motion.div>
+      </div>
+
+      {/* Footer */}
+      <div className="px-6 pb-safe py-4">
+        <motion.button
+          whileTap={{ scale: 0.98 }}
+          onClick={handleNext}
+          disabled={isLoading || !selectedCurrency}
+          className={cn(
+            'w-full flex items-center justify-center gap-2 py-4 rounded-2xl font-semibold text-white transition-all',
+            selectedCurrency
+              ? 'bg-[rgb(var(--primary))]'
+              : 'bg-[rgb(var(--foreground-muted))]'
+          )}
+        >
+          {isLoading ? (
+            <div className="flex items-center gap-2">
+              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              <span>Setting up...</span>
+            </div>
+          ) : (
+            <>
+              <span>Continue</span>
+              <ChevronRight className="w-5 h-5" />
+            </>
+          )}
+        </motion.button>
+      </div>
     </div>
   );
 }
