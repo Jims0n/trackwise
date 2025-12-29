@@ -113,17 +113,18 @@ export default function SettingsPage() {
             <div className="card overflow-hidden divide-y divide-[rgb(var(--border))]">
               {/* Theme */}
               <SettingsRow
-                icon={<Sun className="w-5 h-5" />}
+                icon={theme === 'dark' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
                 title="Theme"
                 subtitle={theme === 'light' ? 'Light' : theme === 'dark' ? 'Dark' : 'System'}
                 onClick={() => {
                   const next = theme === 'light' ? 'dark' : 'light';
                   setTheme(next);
+                  toast.success(`Theme changed to ${next}`);
                 }}
                 trailing={
                   <div className="flex items-center gap-2 bg-[rgb(var(--background-secondary))] p-1 rounded-full">
                     <button
-                      onClick={(e) => { e.stopPropagation(); setTheme('light'); }}
+                      onClick={(e) => { e.stopPropagation(); setTheme('light'); toast.success('Theme changed to light'); }}
                       className={cn(
                         'p-2 rounded-full transition-colors',
                         theme === 'light' && 'bg-[rgb(var(--card))] shadow-sm'
@@ -132,7 +133,7 @@ export default function SettingsPage() {
                       <Sun className="w-4 h-4" />
                     </button>
                     <button
-                      onClick={(e) => { e.stopPropagation(); setTheme('dark'); }}
+                      onClick={(e) => { e.stopPropagation(); setTheme('dark'); toast.success('Theme changed to dark'); }}
                       className={cn(
                         'p-2 rounded-full transition-colors',
                         theme === 'dark' && 'bg-[rgb(var(--card))] shadow-sm'
@@ -301,6 +302,7 @@ export default function SettingsPage() {
               onClick={() => {
                 setAccentColor(color.value);
                 setShowColorPicker(false);
+                toast.success(`Accent color changed to ${color.name}`);
               }}
               className={cn(
                 'flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all',
