@@ -2,7 +2,7 @@
 
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import { Plus, Wallet } from "lucide-react";
 import Link from "next/link";
@@ -14,6 +14,8 @@ import { HeroBalance } from "@/components/home/hero-balance";
 import { MonthlySummary } from "@/components/home/monthly-summary";
 import { QuickActions } from "@/components/home/quick-actions";
 import { RecentTransactions } from "@/components/home/recent-transactions";
+import { AIInsights, AIChat } from "@/components/ai";
+import { MoneyFlowSankey } from "@/components/charts";
 
 // Hooks & Data
 import { useDashboardData } from "@/hooks/use-dashboard-data";
@@ -21,13 +23,35 @@ import { useDashboardData } from "@/hooks/use-dashboard-data";
 export default function Dashboard() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  
+
   // Get real data only - no more demo data fallback
   const { netWorth, monthlyFlow, recentTransactions, accounts, isLoading } = useDashboardData();
-  
+
   // Check if user has any accounts
   const hasAccounts = accounts.length > 0;
-  
+
+  // Prepare money flow data from monthly flow
+  const moneyFlowData = useMemo(() => {
+    if (!monthlyFlow) {
+      return { income: [], expenses: [] };
+    }
+
+    // Create income sources (simplified - just "Income" for now, could be expanded)
+    const income = monthlyFlow.income > 0
+      ? [{ source: 'Income', amount: monthlyFlow.income, color: '#10B981' }]
+      : [];
+
+    // Create expense categories from monthly flow
+    const expenses = (monthlyFlow.byCategory || []).slice(0, 5).map((cat) => ({
+      category: cat.category,
+      amount: cat.amount,
+      color: cat.color || '#F43F5E',
+      icon: cat.icon || '📦',
+    }));
+
+    return { income, expenses };
+  }, [monthlyFlow]);
+
   // Check authentication (middleware handles currency redirect)
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -56,7 +80,7 @@ export default function Dashboard() {
     return (
       <PageContainer className="pb-28">
         <Header />
-        
+
         {/* Welcome Empty State */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -70,10 +94,10 @@ export default function Dashboard() {
             changePercentage={0}
             label="Total Balance"
           />
-          
+
           {/* Quick Actions */}
           <QuickActions />
-          
+
           {/* Get Started Card */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -99,6 +123,9 @@ export default function Dashboard() {
             </Link>
           </motion.div>
         </motion.div>
+
+        {/* AI Chat (available even for new users) */}
+        <AIChat />
       </PageContainer>
     );
   }
@@ -121,6 +148,9 @@ export default function Dashboard() {
       {/* Quick Actions */}
       <QuickActions />
 
+      {/* AI Insights */}
+      <AIInsights className="mt-4" />
+
       {/* Monthly Cash Flow Summary */}
       <StaggerContainer className="space-y-6 mt-6">
         {monthlyFlow && (
@@ -136,11 +166,19 @@ export default function Dashboard() {
           </StaggerItem>
         )}
 
+        {/* Money Flow Sankey Diagram */}
+        <StaggerItem>
+          <MoneyFlowSankey data={moneyFlowData} />
+        </StaggerItem>
+
         {/* Recent Transactions */}
         <StaggerItem>
           <RecentTransactions transactions={recentTransactions} limit={5} />
         </StaggerItem>
       </StaggerContainer>
+
+      {/* Floating AI Chat Button */}
+      <AIChat />
     </PageContainer>
   );
 }
