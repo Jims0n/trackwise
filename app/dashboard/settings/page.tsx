@@ -1,31 +1,35 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
-  Moon, 
-  Sun, 
-  Palette, 
-  Globe, 
-  Bell, 
-  Shield, 
-  HelpCircle, 
+import {
+  Moon,
+  Sun,
+  Palette,
+  Globe,
+  Bell,
+  Shield,
+  HelpCircle,
   LogOut,
   ChevronRight,
   Check,
   X,
-  User,
   CreditCard,
   FileText,
-  Star
+  Sparkles,
+  Download,
+  Info
 } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import Image from "next/image";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 import { useUIStore } from "@/stores/ui-store";
 import { cn } from "@/lib/utils";
 import { PageContainer, StaggerContainer, StaggerItem } from "@/components/layout/page-container";
 import { PageHeader } from "@/components/layout/header";
+import { updateUserPreferences, exportTransactionsCSV, getAppInfo, getUserPreferences } from "@/app/actions/preferences";
+import { getAIProvider } from "@/app/actions/ai";
 
 const currencies = [
   { code: 'USD', symbol: '$', name: 'US Dollar' },
@@ -51,17 +55,123 @@ const accentColors = [
 ];
 
 export default function SettingsPage() {
+  const router = useRouter();
   const { data: session } = useSession();
   const { theme, setTheme, currency, currencySymbol, setCurrency, accentColor, setAccentColor } = useUIStore();
   const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
-  const handleCurrencySelect = (code: string, symbol: string) => {
+  // Notification preferences
+  const [emailNotifications, setEmailNotifications] = useState(true);
+  const [budgetAlerts, setBudgetAlerts] = useState(true);
+  const [weeklyDigest, setWeeklyDigest] = useState(false);
+
+  // AI settings
+  const [aiProvider, setAiProvider] = useState<'gemini' | 'openai'>('gemini');
+  const [aiAvailable, setAiAvailable] = useState<string[]>([]);
+
+  // App info
+  const [appVersion, setAppVersion] = useState('2.0.0');
+  const [transactionCount, setTransactionCount] = useState(0);
+
+  // Load preferences and app info
+  useEffect(() => {
+    async function loadData() {
+      const [prefsResult, aiResult, infoResult] = await Promise.all([
+        getUserPreferences(),
+        getAIProvider(),
+        getAppInfo(),
+      ]);
+
+      if (prefsResult.preferences) {
+        setEmailNotifications(prefsResult.preferences.emailNotifications);
+        setBudgetAlerts(prefsResult.preferences.budgetAlerts);
+        setWeeklyDigest(prefsResult.preferences.weeklyDigest);
+      }
+
+      if (aiResult.provider) {
+        setAiProvider(aiResult.provider);
+        setAiAvailable(aiResult.available);
+      }
+
+      if (infoResult.success) {
+        setAppVersion(infoResult.version!);
+        setTransactionCount(infoResult.transactionCount!);
+      }
+    }
+    loadData();
+  }, []);
+
+  const handleCurrencySelect = async (code: string, symbol: string) => {
     setCurrency(code, symbol);
-    // Also save to cookie for server-side use (1 year expiry)
-    document.cookie = `userCurrency=${code}; path=/; max-age=${60*60*24*365}; SameSite=Lax`;
+    document.cookie = `userCurrency=${code}; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`;
+
+    // Save to database
+    await updateUserPreferences({ defaultCurrency: code });
+
     setShowCurrencyPicker(false);
     toast.success(`Currency changed to ${code}`);
+  };
+
+  const handleThemeChange = async (newTheme: 'light' | 'dark') => {
+    setTheme(newTheme);
+    await updateUserPreferences({ theme: newTheme });
+    toast.success(`Theme changed to ${newTheme}`);
+  };
+
+  const handleAccentColorChange = async (color: string, name: string) => {
+    setAccentColor(color);
+    await updateUserPreferences({ accentColor: color });
+    setShowColorPicker(false);
+    toast.success(`Accent color changed to ${name}`);
+  };
+
+  const handleNotificationToggle = async (type: 'email' | 'budget' | 'digest', value: boolean) => {
+    switch (type) {
+      case 'email':
+        setEmailNotifications(value);
+        await updateUserPreferences({ emailNotifications: value });
+        break;
+      case 'budget':
+        setBudgetAlerts(value);
+        await updateUserPreferences({ budgetAlerts: value });
+        break;
+      case 'digest':
+        setWeeklyDigest(value);
+        await updateUserPreferences({ weeklyDigest: value });
+        break;
+    }
+    toast.success('Preferences updated');
+  };
+
+  const handleExportData = async () => {
+    setIsExporting(true);
+    try {
+      const result = await exportTransactionsCSV();
+
+      if (result.error) {
+        toast.error(result.error);
+        return;
+      }
+
+      // Create and download CSV file
+      const blob = new Blob([result.csv!], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `trackwise-transactions-${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+
+      toast.success(`Exported ${result.count} transactions`);
+    } catch (error) {
+      toast.error('Failed to export data');
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const handleSignOut = () => {
@@ -71,8 +181,8 @@ export default function SettingsPage() {
   return (
     <PageContainer>
       {/* Header */}
-      <PageHeader 
-        title="Settings" 
+      <PageHeader
+        title="Settings"
         subtitle="Customize your experience"
       />
 
@@ -101,7 +211,6 @@ export default function SettingsPage() {
                 <h3 className="text-title">{session?.user?.name || 'User'}</h3>
                 <p className="text-caption">{session?.user?.email}</p>
               </div>
-              <ChevronRight className="w-5 h-5 text-[rgb(var(--foreground-muted))]" />
             </div>
           </motion.div>
         </StaggerItem>
@@ -115,16 +224,12 @@ export default function SettingsPage() {
               <SettingsRow
                 icon={theme === 'dark' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
                 title="Theme"
-                subtitle={theme === 'light' ? 'Light' : theme === 'dark' ? 'Dark' : 'System'}
-                onClick={() => {
-                  const next = theme === 'light' ? 'dark' : 'light';
-                  setTheme(next);
-                  toast.success(`Theme changed to ${next}`);
-                }}
+                subtitle={theme === 'light' ? 'Light' : 'Dark'}
+                onClick={() => { }}
                 trailing={
                   <div className="flex items-center gap-2 bg-[rgb(var(--background-secondary))] p-1 rounded-full">
                     <button
-                      onClick={(e) => { e.stopPropagation(); setTheme('light'); toast.success('Theme changed to light'); }}
+                      onClick={(e) => { e.stopPropagation(); handleThemeChange('light'); }}
                       className={cn(
                         'p-2 rounded-full transition-colors',
                         theme === 'light' && 'bg-[rgb(var(--card))] shadow-sm'
@@ -133,7 +238,7 @@ export default function SettingsPage() {
                       <Sun className="w-4 h-4" />
                     </button>
                     <button
-                      onClick={(e) => { e.stopPropagation(); setTheme('dark'); toast.success('Theme changed to dark'); }}
+                      onClick={(e) => { e.stopPropagation(); handleThemeChange('dark'); }}
                       className={cn(
                         'p-2 rounded-full transition-colors',
                         theme === 'dark' && 'bg-[rgb(var(--card))] shadow-sm'
@@ -152,7 +257,7 @@ export default function SettingsPage() {
                 subtitle="Customize app color"
                 onClick={() => setShowColorPicker(true)}
                 trailing={
-                  <div 
+                  <div
                     className="w-6 h-6 rounded-full"
                     style={{ backgroundColor: accentColor }}
                   />
@@ -178,13 +283,58 @@ export default function SettingsPage() {
               {/* Notifications */}
               <SettingsRow
                 icon={<Bell className="w-5 h-5" />}
-                title="Notifications"
-                subtitle="Manage alerts & reminders"
-                onClick={() => {}}
+                title="Email Notifications"
+                subtitle="Get updates via email"
+                onClick={() => handleNotificationToggle('email', !emailNotifications)}
+                trailing={
+                  <Toggle enabled={emailNotifications} />
+                }
+              />
+
+              <SettingsRow
+                icon={<Bell className="w-5 h-5" />}
+                title="Budget Alerts"
+                subtitle="Notify when over budget"
+                onClick={() => handleNotificationToggle('budget', !budgetAlerts)}
+                trailing={
+                  <Toggle enabled={budgetAlerts} />
+                }
+              />
+
+              <SettingsRow
+                icon={<Bell className="w-5 h-5" />}
+                title="Weekly Digest"
+                subtitle="Summary every Monday"
+                onClick={() => handleNotificationToggle('digest', !weeklyDigest)}
+                trailing={
+                  <Toggle enabled={weeklyDigest} />
+                }
               />
             </div>
           </div>
         </StaggerItem>
+
+        {/* AI Settings */}
+        {aiAvailable.length > 0 && (
+          <StaggerItem>
+            <div className="space-y-2">
+              <p className="text-micro px-1">AI FEATURES</p>
+              <div className="card overflow-hidden divide-y divide-[rgb(var(--border))]">
+                <SettingsRow
+                  icon={<Sparkles className="w-5 h-5" />}
+                  title="AI Provider"
+                  subtitle={`Using ${aiProvider === 'openai' ? 'OpenAI GPT-4o-mini' : 'Google Gemini 2.0'}`}
+                  onClick={() => { }}
+                  trailing={
+                    <span className="text-xs text-[rgb(var(--foreground-muted))] px-2 py-1 rounded-full bg-[rgb(var(--background-secondary))]">
+                      {aiAvailable.join(' + ').toUpperCase()}
+                    </span>
+                  }
+                />
+              </div>
+            </div>
+          </StaggerItem>
+        )}
 
         {/* Data Section */}
         <StaggerItem>
@@ -195,19 +345,33 @@ export default function SettingsPage() {
                 icon={<CreditCard className="w-5 h-5" />}
                 title="Accounts"
                 subtitle="Manage connected accounts"
-                onClick={() => {}}
+                onClick={() => router.push('/dashboard/accounts')}
               />
               <SettingsRow
                 icon={<FileText className="w-5 h-5" />}
                 title="Export Data"
-                subtitle="Download your transactions"
-                onClick={() => {}}
+                subtitle={`Export ${transactionCount} transactions`}
+                onClick={handleExportData}
+                trailing={
+                  isExporting ? (
+                    <div className="animate-spin">
+                      <Download className="w-5 h-5" />
+                    </div>
+                  ) : (
+                    <Download className="w-5 h-5 text-[rgb(var(--foreground-muted))]" />
+                  )
+                }
               />
               <SettingsRow
                 icon={<Shield className="w-5 h-5" />}
                 title="Privacy & Security"
-                subtitle="Manage your data"
-                onClick={() => {}}
+                subtitle="Your data is encrypted"
+                onClick={() => { }}
+                trailing={
+                  <span className="text-xs text-[rgb(var(--income))] px-2 py-1 rounded-full bg-[rgb(var(--income))]/10">
+                    Protected
+                  </span>
+                }
               />
             </div>
           </div>
@@ -216,19 +380,24 @@ export default function SettingsPage() {
         {/* Support Section */}
         <StaggerItem>
           <div className="space-y-2">
-            <p className="text-micro px-1">SUPPORT</p>
+            <p className="text-micro px-1">ABOUT</p>
             <div className="card overflow-hidden divide-y divide-[rgb(var(--border))]">
+              <SettingsRow
+                icon={<Info className="w-5 h-5" />}
+                title="App Version"
+                subtitle={`v${appVersion}`}
+                onClick={() => { }}
+                trailing={
+                  <span className="text-xs text-[rgb(var(--foreground-muted))]">
+                    Latest
+                  </span>
+                }
+              />
               <SettingsRow
                 icon={<HelpCircle className="w-5 h-5" />}
                 title="Help & Support"
                 subtitle="Get help with the app"
-                onClick={() => {}}
-              />
-              <SettingsRow
-                icon={<Star className="w-5 h-5" />}
-                title="Rate the App"
-                subtitle="Share your feedback"
-                onClick={() => {}}
+                onClick={() => window.open('mailto:support@trackwise.app', '_blank')}
               />
             </div>
           </div>
@@ -244,13 +413,6 @@ export default function SettingsPage() {
             <LogOut className="w-5 h-5" />
             <span className="font-medium">Sign Out</span>
           </motion.button>
-        </StaggerItem>
-
-        {/* Version */}
-        <StaggerItem>
-          <p className="text-center text-micro py-4">
-            Trackwise v1.0.0
-          </p>
         </StaggerItem>
       </StaggerContainer>
 
@@ -299,11 +461,7 @@ export default function SettingsPage() {
             <motion.button
               key={color.value}
               whileTap={{ scale: 0.95 }}
-              onClick={() => {
-                setAccentColor(color.value);
-                setShowColorPicker(false);
-                toast.success(`Accent color changed to ${color.name}`);
-              }}
+              onClick={() => handleAccentColorChange(color.value, color.name)}
               className={cn(
                 'flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all',
                 accentColor === color.value
@@ -311,7 +469,7 @@ export default function SettingsPage() {
                   : 'border-transparent bg-[rgb(var(--background-secondary))]'
               )}
             >
-              <div 
+              <div
                 className="w-10 h-10 rounded-full"
                 style={{ backgroundColor: color.value }}
               />
@@ -321,6 +479,23 @@ export default function SettingsPage() {
         </div>
       </PickerModal>
     </PageContainer>
+  );
+}
+
+function Toggle({ enabled }: { enabled: boolean }) {
+  return (
+    <div
+      className={cn(
+        'w-11 h-6 rounded-full transition-colors relative',
+        enabled ? 'bg-[rgb(var(--income))]' : 'bg-[rgb(var(--background-secondary))]'
+      )}
+    >
+      <motion.div
+        animate={{ x: enabled ? 20 : 2 }}
+        transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+        className="absolute top-1 w-4 h-4 rounded-full bg-white shadow-sm"
+      />
+    </div>
   );
 }
 

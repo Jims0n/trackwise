@@ -2,25 +2,32 @@
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { TrendingUp, TrendingDown, PieChart, BarChart3, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
+import { TrendingUp, TrendingDown, PieChart, BarChart3, Sparkles } from "lucide-react";
 import { useUIStore } from "@/stores/ui-store";
 import { useDashboardData } from "@/hooks/use-dashboard-data";
 import { cn } from "@/lib/utils";
 import { PageContainer, StaggerContainer, StaggerItem } from "@/components/layout/page-container";
 import { PageHeader } from "@/components/layout/header";
-import { getTransactionStats } from "@/app/actions/transaction";
+import { AIInsights } from "@/components/ai";
+import { SpendingTrendsChart, SpendingPatterns } from "@/components/charts";
+import {
+  getTransactionStats,
+  getMonthlyTrends,
+  getComparisonStats,
+  getSpendingPatterns
+} from "@/app/actions/transaction";
 
 type TimeRange = 'week' | 'month' | 'year';
 
 export default function InsightsPage() {
   const [timeRange, setTimeRange] = useState<TimeRange>('month');
   const { currencySymbol } = useUIStore();
-  const { monthlyFlow, isLoading } = useDashboardData();
-  
-  // Loading state for stats
+  const { isLoading } = useDashboardData();
+
+  // Loading states
   const [isLoadingStats, setIsLoadingStats] = useState(true);
-  
-  // Stats from real data
+
+  // Data states
   const [stats, setStats] = useState<{
     income: number;
     expenses: number;
@@ -36,37 +43,84 @@ export default function InsightsPage() {
       transactionCount: number;
     }>;
   } | null>(null);
-  
-  // Fetch stats when time range changes
+
+  const [trends, setTrends] = useState<Array<{
+    month: string;
+    year: number;
+    monthNum: number;
+    income: number;
+    expenses: number;
+    savings: number;
+  }>>([]);
+
+  const [comparison, setComparison] = useState<{
+    current: { income: number; expenses: number };
+    previous: { income: number; expenses: number };
+    changes: { income: number; expenses: number };
+  } | null>(null);
+
+  const [patterns, setPatterns] = useState<{
+    transactionCount: number;
+    avgTransaction: number;
+    peakSpendingDay: string;
+    peakSpendingAmount: number;
+    byDayOfWeek: Array<{ day: string; count: number; amount: number }>;
+    topMerchants: Array<{ merchant: string; count: number }>;
+  } | null>(null);
+
+  // Fetch all data when time range changes
   useEffect(() => {
-    async function loadStats() {
+    async function loadData() {
       setIsLoadingStats(true);
-      const result = await getTransactionStats(timeRange);
-      if (!result.error) {
+
+      const [statsResult, trendsResult, comparisonResult, patternsResult] = await Promise.all([
+        getTransactionStats(timeRange),
+        getMonthlyTrends(6),
+        getComparisonStats(timeRange),
+        getSpendingPatterns(),
+      ]);
+
+      if (!statsResult.error) {
         setStats({
-          income: result.income || 0,
-          expenses: result.expenses || 0,
-          savings: result.savings || 0,
-          savingsRate: result.savingsRate || 0,
-          byCategory: result.byCategory || [],
+          income: statsResult.income || 0,
+          expenses: statsResult.expenses || 0,
+          savings: statsResult.savings || 0,
+          savingsRate: statsResult.savingsRate || 0,
+          byCategory: statsResult.byCategory || [],
         });
       }
+
+      if (!trendsResult.error && trendsResult.trends) {
+        setTrends(trendsResult.trends);
+      }
+
+      if (!comparisonResult.error && comparisonResult.current) {
+        setComparison({
+          current: comparisonResult.current,
+          previous: comparisonResult.previous!,
+          changes: comparisonResult.changes!,
+        });
+      }
+
+      if (!patternsResult.error && patternsResult.patterns) {
+        setPatterns(patternsResult.patterns);
+      }
+
       setIsLoadingStats(false);
     }
-    loadStats();
+    loadData();
   }, [timeRange]);
 
-  // Use fetched stats or fall back to monthlyFlow
-  const categorySpending = stats?.byCategory || monthlyFlow?.byCategory || [];
-  const totalExpenses = stats?.expenses ?? monthlyFlow?.expenses ?? 0;
-  const totalIncome = stats?.income ?? monthlyFlow?.income ?? 0;
-  const savingsRate = stats?.savingsRate ?? monthlyFlow?.savingsRate ?? 0;
+  const categorySpending = stats?.byCategory || [];
+  const totalExpenses = stats?.expenses ?? 0;
+  const totalIncome = stats?.income ?? 0;
+  const savingsRate = stats?.savingsRate ?? 0;
 
   return (
     <PageContainer>
       {/* Header */}
-      <PageHeader 
-        title="Insights" 
+      <PageHeader
+        title="Insights"
         subtitle="Understand your spending habits"
       />
 
@@ -90,6 +144,11 @@ export default function InsightsPage() {
       </div>
 
       <StaggerContainer className="space-y-6">
+        {/* AI Insights Section */}
+        <StaggerItem>
+          <AIInsights />
+        </StaggerItem>
+
         {/* Summary Cards */}
         <StaggerItem>
           <div className="grid grid-cols-2 gap-3">
@@ -117,9 +176,9 @@ export default function InsightsPage() {
               <p className="text-micro">SAVINGS RATE</p>
               <span className={cn(
                 'text-2xl font-bold tabular-nums',
-                savingsRate >= 20 ? 'text-[rgb(var(--income))]' : 
-                savingsRate >= 0 ? 'text-[rgb(var(--foreground))]' : 
-                'text-[rgb(var(--expense))]'
+                savingsRate >= 20 ? 'text-[rgb(var(--income))]' :
+                  savingsRate >= 0 ? 'text-[rgb(var(--foreground))]' :
+                    'text-[rgb(var(--expense))]'
               )}>
                 {savingsRate.toFixed(0)}%
               </span>
@@ -131,21 +190,26 @@ export default function InsightsPage() {
                 transition={{ duration: 1, ease: 'easeOut' }}
                 className={cn(
                   'h-full rounded-full',
-                  savingsRate >= 20 ? 'bg-[rgb(var(--income))]' : 
-                  savingsRate >= 0 ? 'bg-[rgb(var(--savings))]' : 
-                  'bg-[rgb(var(--expense))]'
+                  savingsRate >= 20 ? 'bg-[rgb(var(--income))]' :
+                    savingsRate >= 0 ? 'bg-[rgb(var(--savings))]' :
+                      'bg-[rgb(var(--expense))]'
                 )}
               />
             </div>
             <p className="text-caption mt-3">
-              {savingsRate >= 20 
+              {savingsRate >= 20
                 ? "🎉 Great job! You're saving more than the recommended 20%"
-                : savingsRate >= 0 
-                ? "💡 Try to save at least 20% of your income"
-                : "⚠️ You're spending more than you earn this month"
+                : savingsRate >= 0
+                  ? "💡 Try to save at least 20% of your income"
+                  : "⚠️ You're spending more than you earn this month"
               }
             </p>
           </motion.div>
+        </StaggerItem>
+
+        {/* Spending Trends Chart */}
+        <StaggerItem>
+          <SpendingTrendsChart data={trends} />
         </StaggerItem>
 
         {/* Spending by Category */}
@@ -179,62 +243,46 @@ export default function InsightsPage() {
           </motion.div>
         </StaggerItem>
 
-        {/* Monthly Comparison */}
-        <StaggerItem>
-          <motion.div className="card p-6">
-            <div className="flex items-center gap-2 mb-6">
-              <BarChart3 className="w-5 h-5 text-[rgb(var(--secondary))]" />
-              <h3 className="text-title">This Month vs Last Month</h3>
-            </div>
-
-            <div className="space-y-4">
-              <ComparisonRow
-                label="Income"
-                current={totalIncome}
-                previous={totalIncome * 0.95}
-                color="income"
-                currencySymbol={currencySymbol}
-              />
-              <ComparisonRow
-                label="Expenses"
-                current={totalExpenses}
-                previous={totalExpenses * 1.1}
-                color="expense"
-                currencySymbol={currencySymbol}
-                invertChange
-              />
-            </div>
-          </motion.div>
-        </StaggerItem>
-
-        {/* Top Spending Categories Summary */}
-        {categorySpending.length > 0 && (
+        {/* Monthly Comparison - Now with Real Data */}
+        {comparison && (
           <StaggerItem>
             <motion.div className="card p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-title">Top Spending</h3>
-                <span className="text-caption capitalize">{timeRange === 'month' ? 'This month' : timeRange === 'week' ? 'This week' : 'This year'}</span>
+              <div className="flex items-center gap-2 mb-6">
+                <BarChart3 className="w-5 h-5 text-[rgb(var(--secondary))]" />
+                <h3 className="text-title">
+                  {timeRange === 'week' ? 'This Week vs Last Week' :
+                    timeRange === 'year' ? 'This Year vs Last Year' :
+                      'This Month vs Last Month'}
+                </h3>
               </div>
-              
-              <div className="space-y-3">
-                {categorySpending.slice(0, 4).map((cat, index) => (
-                  <div key={cat.categoryId} className="flex items-center gap-3">
-                    <span className="text-lg">{cat.icon}</span>
-                    <div className="flex-1">
-                      <p className="font-medium">{cat.category}</p>
-                      <p className="text-xs text-[rgb(var(--foreground-muted))]">
-                        {cat.transactionCount} transaction{cat.transactionCount !== 1 ? 's' : ''}
-                      </p>
-                    </div>
-                    <p className="font-semibold tabular-nums">
-                      {currencySymbol}{cat.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                    </p>
-                  </div>
-                ))}
+
+              <div className="space-y-4">
+                <ComparisonRow
+                  label="Income"
+                  current={comparison.current.income}
+                  previous={comparison.previous.income}
+                  changePercent={comparison.changes.income}
+                  color="income"
+                  currencySymbol={currencySymbol}
+                />
+                <ComparisonRow
+                  label="Expenses"
+                  current={comparison.current.expenses}
+                  previous={comparison.previous.expenses}
+                  changePercent={comparison.changes.expenses}
+                  color="expense"
+                  currencySymbol={currencySymbol}
+                  invertChange
+                />
               </div>
             </motion.div>
           </StaggerItem>
         )}
+
+        {/* Spending Patterns */}
+        <StaggerItem>
+          <SpendingPatterns data={patterns} />
+        </StaggerItem>
       </StaggerContainer>
     </PageContainer>
   );
@@ -331,6 +379,7 @@ function ComparisonRow({
   label,
   current,
   previous,
+  changePercent,
   color,
   currencySymbol,
   invertChange = false,
@@ -338,20 +387,19 @@ function ComparisonRow({
   label: string;
   current: number;
   previous: number;
+  changePercent: number;
   color: 'income' | 'expense';
   currencySymbol: string;
   invertChange?: boolean;
 }) {
-  const change = current - previous;
-  const changePercent = previous > 0 ? (change / previous) * 100 : 0;
-  const isPositive = invertChange ? change < 0 : change > 0;
+  const isPositive = invertChange ? changePercent < 0 : changePercent > 0;
 
   return (
     <div className="flex items-center justify-between">
       <div>
         <p className="font-medium">{label}</p>
         <p className="text-sm text-[rgb(var(--foreground-muted))]">
-          vs {currencySymbol}{previous.toLocaleString('en-US', { minimumFractionDigits: 0 })} last month
+          vs {currencySymbol}{previous.toLocaleString('en-US', { minimumFractionDigits: 0 })} prev
         </p>
       </div>
       <div className="text-right">
@@ -365,7 +413,7 @@ function ComparisonRow({
           'text-sm tabular-nums',
           isPositive ? 'text-[rgb(var(--income))]' : 'text-[rgb(var(--expense))]'
         )}>
-          {isPositive ? '+' : ''}{changePercent.toFixed(0)}%
+          {changePercent >= 0 ? '+' : ''}{changePercent.toFixed(0)}%
         </p>
       </div>
     </div>
