@@ -5,6 +5,7 @@ import { ArrowRight, TrendingUp } from 'lucide-react';
 import { useRef } from 'react';
 import { useUIStore } from '@/stores/ui-store';
 import { cn } from '@/lib/utils';
+import Link from 'next/link';
 
 interface MonthlySummaryProps {
   month: string;
@@ -48,14 +49,16 @@ export function MonthlySummary({
           <p className="text-micro">{month.toUpperCase()} {year}</p>
           <h2 className="text-title mt-1">Cash Flow</h2>
         </div>
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          className="text-caption flex items-center gap-1 hover:text-[rgb(var(--primary))] transition-colors"
-        >
-          Details
-          <ArrowRight className="w-4 h-4" />
-        </motion.button>
+        <Link href="/dashboard/insights">
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className="text-caption flex items-center gap-1 hover:text-[rgb(var(--primary))] transition-colors"
+          >
+            Details
+            <ArrowRight className="w-4 h-4" />
+          </motion.button>
+        </Link>
       </div>
 
       {/* Waterfall Visualization */}
@@ -99,9 +102,9 @@ export function MonthlySummary({
           <span className="text-caption">Savings Rate</span>
           <span className={cn(
             'text-title tabular-nums',
-            savingsRate >= 20 ? 'text-[rgb(var(--income))]' : 
-            savingsRate >= 0 ? 'text-[rgb(var(--foreground))]' : 
-            'text-[rgb(var(--expense))]'
+            savingsRate >= 20 ? 'text-[rgb(var(--income))]' :
+              savingsRate >= 0 ? 'text-[rgb(var(--foreground))]' :
+                'text-[rgb(var(--expense))]'
           )}>
             {savingsRate.toFixed(0)}%
           </span>
@@ -113,9 +116,9 @@ export function MonthlySummary({
             transition={{ duration: 1, delay: 0.6, ease: 'easeOut' }}
             className={cn(
               'h-full rounded-full',
-              savingsRate >= 20 ? 'bg-[rgb(var(--income))]' : 
-              savingsRate >= 0 ? 'bg-[rgb(var(--savings))]' : 
-              'bg-[rgb(var(--expense))]'
+              savingsRate >= 20 ? 'bg-[rgb(var(--income))]' :
+                savingsRate >= 0 ? 'bg-[rgb(var(--savings))]' :
+                  'bg-[rgb(var(--expense))]'
             )}
           />
         </div>
