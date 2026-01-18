@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { getAvailableCurrencies } from "@/lib/currency";
 import { useUIStore } from "@/stores/ui-store";
 import { cn } from "@/lib/utils";
+import { updateUserPreferences } from "@/app/actions/preferences";
 
 const currencies = getAvailableCurrencies();
 
@@ -28,12 +29,15 @@ export default function CurrencySelectionPage() {
     setIsLoading(true);
 
     try {
+      // Save to database
+      await updateUserPreferences({ defaultCurrency: selectedCurrency });
+
       // Store in cookie for server-side
-      document.cookie = `userCurrency=${selectedCurrency}; path=/; max-age=${60*60*24*365}; SameSite=Lax`;
-      
+      document.cookie = `userCurrency=${selectedCurrency}; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`;
+
       // Store in Zustand for client-side
       setCurrency(selectedCurrency, selectedCurrencyData.symbol);
-      
+
       setTimeout(() => {
         router.push("/dashboard");
       }, 300);

@@ -41,7 +41,7 @@ export default function AccountsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
   const { currencySymbol } = useUIStore();
-  
+
   const loadAccounts = async () => {
     try {
       const result = await getFinancialAccounts();
@@ -60,18 +60,18 @@ export default function AccountsPage() {
   useEffect(() => {
     loadAccounts();
   }, []);
-  
+
   const handleAccountClick = (accountId: string) => {
     router.push(`/dashboard/accounts/${accountId}/transactions`);
   };
 
   const totalBalance = accounts.reduce((sum, acc) => sum + acc.balance, 0);
-  
+
   return (
     <PageContainer>
       {/* Header */}
-      <PageHeader 
-        title="Accounts" 
+      <PageHeader
+        title="Accounts"
         subtitle="Manage your financial accounts"
         action={
           <motion.button
@@ -154,15 +154,15 @@ function AccountCard({
   const handleDelete = async (e: React.MouseEvent) => {
     e.stopPropagation();
     setShowMenu(false);
-    
+
     if (!confirm(`Are you sure you want to delete "${account.name}"?`)) {
       return;
     }
-    
+
     setIsDeleting(true);
     const result = await deleteFinancialAccount(account.id);
     setIsDeleting(false);
-    
+
     if (result.error) {
       toast.error(result.error);
     } else {
@@ -182,7 +182,7 @@ function AccountCard({
         disabled={isDeleting}
       >
         <div className="flex items-center gap-4">
-          <div 
+          <div
             className="w-12 h-12 rounded-2xl flex items-center justify-center"
             style={{ backgroundColor: `${color}20` }}
           >
@@ -202,7 +202,7 @@ function AccountCard({
           <ChevronRight className="w-5 h-5 text-[rgb(var(--foreground-muted))]" />
         </div>
       </motion.button>
-      
+
       {/* Menu Button */}
       <motion.button
         whileTap={{ scale: 0.9 }}
@@ -211,7 +211,7 @@ function AccountCard({
       >
         <MoreVertical className="w-4 h-4 text-[rgb(var(--foreground-muted))]" />
       </motion.button>
-      
+
       {/* Dropdown Menu */}
       <AnimatePresence>
         {showMenu && (
@@ -338,14 +338,14 @@ function AddAccountModal({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-black/50 z-50 backdrop-blur-sm"
+            className="fixed inset-0 bg-black/50 z-[60] backdrop-blur-sm"
           />
           <motion.div
             initial={{ opacity: 0, y: '100%' }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: '100%' }}
             transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-            className="fixed inset-x-0 bottom-0 z-50 rounded-t-3xl bg-[rgb(var(--card))] shadow-2xl max-h-[80vh]"
+            className="fixed inset-x-0 bottom-0 z-[60] rounded-t-3xl bg-[rgb(var(--card))] shadow-2xl max-h-[85vh]"
           >
             {/* Handle */}
             <div className="flex justify-center pt-3 pb-2">
@@ -365,7 +365,7 @@ function AddAccountModal({
             </div>
 
             {/* Form */}
-            <div className="px-6 pb-8 space-y-4 overflow-y-auto max-h-[60vh]">
+            <div className="px-6 pb-24 space-y-4 overflow-y-auto max-h-[calc(85vh-80px)]">
               <div>
                 <label className="text-micro block mb-2">ACCOUNT TYPE</label>
                 <div className="grid grid-cols-3 gap-2">
