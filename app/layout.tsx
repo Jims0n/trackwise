@@ -4,6 +4,7 @@ import "./globals.css";
 import { AuthProvider } from "@/components/auth-provider";
 import { StoreProvider } from "@/components/providers/store-provider";
 import { Toaster } from "@/components/ui/sonner";
+import { Analytics } from "@vercel/analytics/next"
 
 const inter = Inter({
   subsets: ['latin'],
@@ -41,12 +42,13 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-       className={`${inter.variable} font-instrument antialiased`}
+        className={`${inter.variable} font-instrument antialiased`}
       >
         <AuthProvider>
           <StoreProvider>{children}</StoreProvider>
         </AuthProvider>
         <Toaster richColors position="top-right" closeButton />
+        <Analytics />
       </body>
     </html>
   );
