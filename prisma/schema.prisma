@@ -34,6 +34,7 @@ model User {
   budgets           Budget[]
   recurringRules    RecurringRule[]
   netWorthSnapshots NetWorthSnapshot[]
+  cryptoWallets     CryptoWallet[]
 
   @@map("users")
 }
@@ -422,4 +423,82 @@ model ExchangeRate {
   @@unique([fromCurrency, toCurrency, effectiveDate])
   @@index([fromCurrency, toCurrency, effectiveDate])
   @@map("exchange_rates")
+}
+
+// ============================================
+// CRYPTO WALLETS & POSITIONS
+// ============================================
+
+model CryptoWallet {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Wallet details
+  address  String         // Public wallet address
+  network  String         @default("solana") // solana, ethereum, etc
+  label    String?        // User-friendly name
+  platform CryptoPlatform // DRIFT, HYPERLIQUID, etc
+
+  // Cached totals (updated on fetch)
+  totalBalanceUsd  Decimal @default(0) @db.Decimal(20, 8)
+  unrealizedPnlUsd Decimal @default(0) @db.Decimal(20, 8)
+
+  lastSyncedAt DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  // Relations
+  positions PerpPosition[]
+  balances  CryptoBalance[]
+
+  @@unique([userId, address, platform])
+  @@index([userId])
+  @@map("crypto_wallets")
+}
+
+model PerpPosition {
+  id       String       @id @default(cuid())
+  walletId String
+  wallet   CryptoWallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  // Position data
+  market        String // e.g., "SOL-PERP", "BTC-PERP"
+  marketIndex   Int
+  direction     String  // "Long" or "Short"
+  size          Decimal @db.Decimal(20, 8)
+  entryPrice    Decimal @db.Decimal(20, 8)
+  markPrice     Decimal @db.Decimal(20, 8)
+  notionalUsd   Decimal @db.Decimal(20, 8)
+  unrealizedPnl Decimal @db.Decimal(20, 8)
+  pnlPercent    Decimal @db.Decimal(10, 4)
+  leverage      Decimal? @db.Decimal(10, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([walletId])
+  @@map("perp_positions")
+}
+
+model CryptoBalance {
+  id       String       @id @default(cuid())
+  walletId String
+  wallet   CryptoWallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  // Balance data
+  asset    String  // e.g., "USDC", "SOL"
+  amount   Decimal @db.Decimal(20, 8)
+  valueUsd Decimal @db.Decimal(20, 8)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([walletId, asset])
+  @@map("crypto_balances")
+}
+
+enum CryptoPlatform {
+  DRIFT
+  HYPERLIQUID
 }
