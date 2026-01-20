@@ -4,7 +4,8 @@ import { motion } from "framer-motion";
 import { signIn, useSession } from "next-auth/react";
 import { redirect } from "next/navigation";
 import Image from "next/image";
-import { TrendingUp, PieChart, Wallet, Shield } from "lucide-react";
+import Link from "next/link";
+import { TrendingUp, PieChart, Wallet, Shield, ArrowRight } from "lucide-react";
 
 export default function Home() {
   const { data: session, status } = useSession();
@@ -101,6 +102,35 @@ export default function Home() {
           >
             By continuing, you agree to our Terms of Service and Privacy Policy
           </motion.p>
+
+          {/* Crypto Positions Link */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 1.1 }}
+            className="mt-8 pt-8 border-t border-[rgb(var(--border))]"
+          >
+            <Link href="/crypto">
+              <motion.div
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className="flex items-center justify-between p-4 rounded-2xl bg-gradient-to-r from-[rgb(var(--primary))]/10 to-transparent border border-[rgb(var(--primary))]/20 cursor-pointer group"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-[rgb(var(--primary))]/20 flex items-center justify-center">
+                    <TrendingUp className="w-5 h-5 text-[rgb(var(--primary))]" />
+                  </div>
+                  <div className="text-left">
+                    <p className="font-medium text-sm">Drift Positions</p>
+                    <p className="text-xs text-[rgb(var(--foreground-muted))]">
+                      View your perpetual positions
+                    </p>
+                  </div>
+                </div>
+                <ArrowRight className="w-5 h-5 text-[rgb(var(--primary))] group-hover:translate-x-1 transition-transform" />
+              </motion.div>
+            </Link>
+          </motion.div>
         </motion.div>
       </div>
 
@@ -116,3 +146,4 @@ export default function Home() {
     </div>
   );
 }
+

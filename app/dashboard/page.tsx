@@ -4,7 +4,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
-import { Plus, Wallet } from "lucide-react";
+import { Plus, Wallet, BarChart3 } from "lucide-react";
 import Link from "next/link";
 
 // Components
@@ -147,6 +147,28 @@ export default function Dashboard() {
 
       {/* Quick Actions */}
       <QuickActions />
+
+      {/* Crypto Positions Link */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+        className="mt-4"
+      >
+        <Link href="/crypto">
+          <div className="card p-4 flex items-center gap-4 hover:border-[rgb(var(--primary))] transition-colors cursor-pointer">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500/20 to-cyan-500/20 flex items-center justify-center">
+              <BarChart3 className="w-6 h-6 text-emerald-500" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-semibold">Crypto Positions</h3>
+              <p className="text-sm text-[rgb(var(--foreground-muted))]">
+                View your Drift Protocol perps & balances
+              </p>
+            </div>
+          </div>
+        </Link>
+      </motion.div>
 
       {/* AI Insights */}
       <AIInsights className="mt-4" />
