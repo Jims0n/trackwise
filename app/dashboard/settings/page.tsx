@@ -26,6 +26,7 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { useUIStore } from "@/stores/ui-store";
 import { cn } from "@/lib/utils";
+import { useTheme } from "next-themes";
 import { PageContainer, StaggerContainer, StaggerItem } from "@/components/layout/page-container";
 import { PageHeader } from "@/components/layout/header";
 import { updateUserPreferences, exportTransactionsCSV, getAppInfo, getUserPreferences } from "@/app/actions/preferences";
@@ -58,6 +59,7 @@ export default function SettingsPage() {
   const router = useRouter();
   const { data: session } = useSession();
   const { theme, setTheme, currency, currencySymbol, setCurrency, accentColor, setAccentColor } = useUIStore();
+  const { setTheme: setNextTheme, resolvedTheme } = useTheme();
   const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -116,6 +118,7 @@ export default function SettingsPage() {
 
   const handleThemeChange = async (newTheme: 'light' | 'dark') => {
     setTheme(newTheme);
+    setNextTheme(newTheme); // Actually change the theme via next-themes
     await updateUserPreferences({ theme: newTheme });
     toast.success(`Theme changed to ${newTheme}`);
   };
