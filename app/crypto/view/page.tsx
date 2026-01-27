@@ -44,7 +44,9 @@ interface Balance {
 }
 
 interface Subaccount {
-    id: number;
+    id: number | string;  // number for Drift, string (address) for Hyperliquid
+    name?: string;        // Name for Hyperliquid subaccounts
+    address?: string;     // Actual address for Hyperliquid
     exists: boolean;
 }
 
@@ -65,9 +67,11 @@ function CryptoViewContent() {
     const searchParams = useSearchParams();
     const router = useRouter();
     const wallet = searchParams.get("wallet");
+    const protocolParam = searchParams.get("protocol") as 'DRIFT' | 'HYPERLIQUID' | null;
+    const protocol = protocolParam || 'DRIFT';
 
     const [subaccounts, setSubaccounts] = useState<Subaccount[]>([]);
-    const [selectedSubaccount, setSelectedSubaccount] = useState(0);
+    const [selectedSubaccount, setSelectedSubaccount] = useState<number | string>(0);
     const [positions, setPositions] = useState<Position[]>([]);
     const [balances, setBalances] = useState<Balance[]>([]);
     const [orders, setOrders] = useState<Order[]>([]);
@@ -78,17 +82,37 @@ function CryptoViewContent() {
     const [selectedPosition, setSelectedPosition] = useState<Position | null>(null);
     const [activeTab, setActiveTab] = useState<"positions" | "orders">("positions");
 
+    // State for the active wallet address to fetch data for (may be subaccount address for Hyperliquid)
+    const [activeWallet, setActiveWallet] = useState<string | null>(wallet);
+
     // Fetch subaccounts
     useEffect(() => {
         if (!wallet) return;
 
         const fetchSubaccounts = async () => {
             try {
-                const res = await fetch(`/api/drift/subaccounts?wallet=${wallet}`);
-                const data = await res.json();
-                if (res.ok && data.subaccounts.length > 0) {
-                    setSubaccounts(data.subaccounts);
-                    setSelectedSubaccount(data.subaccounts[0].id);
+                if (protocol === 'DRIFT') {
+                    const res = await fetch(`/api/drift/subaccounts?wallet=${wallet}`);
+                    const data = await res.json();
+                    if (res.ok && data.subaccounts.length > 0) {
+                        setSubaccounts(data.subaccounts);
+                        setSelectedSubaccount(data.subaccounts[0].id);
+                    }
+                } else {
+                    // Hyperliquid subaccounts
+                    const res = await fetch(`/api/hyperliquid/subaccounts?wallet=${wallet}`);
+                    const data = await res.json();
+                    if (res.ok && data.subaccounts.length > 0) {
+                        const hlSubaccounts = data.subaccounts.map((sub: { name: string; subAccountUser: string; isMaster: boolean }) => ({
+                            id: sub.subAccountUser,
+                            name: sub.name,
+                            address: sub.subAccountUser,
+                            exists: true,
+                        }));
+                        setSubaccounts(hlSubaccounts);
+                        setSelectedSubaccount(wallet); // Start with master
+                        setActiveWallet(wallet);
+                    }
                 }
             } catch (err) {
                 console.error("Error fetching subaccounts:", err);
@@ -96,7 +120,7 @@ function CryptoViewContent() {
         };
 
         fetchSubaccounts();
-    }, [wallet]);
+    }, [wallet, protocol]);
 
     // Fetch positions, balances, and orders
     const fetchData = useCallback(async () => {
@@ -105,25 +129,51 @@ function CryptoViewContent() {
         try {
             setError(null);
 
-            const [posRes, balRes, ordRes] = await Promise.all([
-                fetch(`/api/drift/positions?wallet=${wallet}&subaccount=${selectedSubaccount}`),
-                fetch(`/api/drift/balances?wallet=${wallet}&subaccount=${selectedSubaccount}`),
-                fetch(`/api/drift/orders?wallet=${wallet}&subaccount=${selectedSubaccount}`),
-            ]);
+            if (protocol === 'DRIFT') {
+                // Drift API endpoints
+                const [posRes, balRes, ordRes] = await Promise.all([
+                    fetch(`/api/drift/positions?wallet=${wallet}&subaccount=${selectedSubaccount}`),
+                    fetch(`/api/drift/balances?wallet=${wallet}&subaccount=${selectedSubaccount}`),
+                    fetch(`/api/drift/orders?wallet=${wallet}&subaccount=${selectedSubaccount}`),
+                ]);
 
-            const [posData, balData, ordData] = await Promise.all([posRes.json(), balRes.json(), ordRes.json()]);
+                const [posData, balData, ordData] = await Promise.all([posRes.json(), balRes.json(), ordRes.json()]);
 
-            if (posRes.ok) {
-                setPositions(posData.positions || []);
-            }
+                if (posRes.ok) {
+                    setPositions(posData.positions || []);
+                }
 
-            if (balRes.ok) {
-                setBalances(balData.balances || []);
-                setEquity(balData.equity || { totalEquity: 0, freeCollateral: 0, marginUsed: 0 });
-            }
+                if (balRes.ok) {
+                    setBalances(balData.balances || []);
+                    setEquity(balData.equity || { totalEquity: 0, freeCollateral: 0, marginUsed: 0, unrealizedPnl: 0, accountHealth: 100, leverage: 0 });
+                }
 
-            if (ordRes.ok) {
-                setOrders(ordData.orders || []);
+                if (ordRes.ok) {
+                    setOrders(ordData.orders || []);
+                }
+            } else {
+                // Hyperliquid API endpoints - use activeWallet for subaccount support
+                const walletToFetch = activeWallet || wallet;
+                const [posRes, balRes, ordRes] = await Promise.all([
+                    fetch(`/api/hyperliquid/positions?wallet=${walletToFetch}`),
+                    fetch(`/api/hyperliquid/balances?wallet=${walletToFetch}`),
+                    fetch(`/api/hyperliquid/orders?wallet=${walletToFetch}`),
+                ]);
+
+                const [posData, balData, ordData] = await Promise.all([posRes.json(), balRes.json(), ordRes.json()]);
+
+                if (posRes.ok) {
+                    setPositions(posData.positions || []);
+                }
+
+                if (balRes.ok) {
+                    setBalances(balData.balances || []);
+                    setEquity(balData.equity || { totalEquity: 0, freeCollateral: 0, marginUsed: 0, unrealizedPnl: 0, accountHealth: 100, leverage: 0 });
+                }
+
+                if (ordRes.ok) {
+                    setOrders(ordData.orders || []);
+                }
             }
 
             setLastUpdated(new Date());
@@ -133,7 +183,7 @@ function CryptoViewContent() {
         } finally {
             setIsLoading(false);
         }
-    }, [wallet, selectedSubaccount]);
+    }, [wallet, selectedSubaccount, protocol, activeWallet]);
 
     // Initial fetch
     useEffect(() => {
@@ -176,6 +226,12 @@ function CryptoViewContent() {
                             <ArrowLeft className="w-5 h-5" />
                         </Link>
                         <div className="flex items-center gap-2">
+                            <span className="text-sm">
+                                {protocol === 'HYPERLIQUID' ? '🟢' : '🟣'}
+                            </span>
+                            <span className="hidden sm:inline text-xs px-2 py-0.5 rounded-full bg-[rgb(var(--primary))]/10 text-[rgb(var(--primary))] font-medium">
+                                {protocol === 'HYPERLIQUID' ? 'Hyperliquid' : 'Drift'}
+                            </span>
                             <Wallet className="w-4 h-4 text-[rgb(var(--foreground-muted))]" />
                             <span className="font-mono text-sm">{shortWallet}</span>
                         </div>
@@ -221,7 +277,13 @@ function CryptoViewContent() {
                             <motion.button
                                 key={sub.id}
                                 whileTap={{ scale: 0.95 }}
-                                onClick={() => setSelectedSubaccount(sub.id)}
+                                onClick={() => {
+                                    setSelectedSubaccount(sub.id);
+                                    // For Hyperliquid, also update activeWallet
+                                    if (protocol === 'HYPERLIQUID' && sub.address) {
+                                        setActiveWallet(sub.address);
+                                    }
+                                }}
                                 className={cn(
                                     "px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-colors",
                                     selectedSubaccount === sub.id
@@ -229,7 +291,7 @@ function CryptoViewContent() {
                                         : "bg-[rgb(var(--card))] border border-[rgb(var(--border))] hover:bg-[rgb(var(--background-secondary))]"
                                 )}
                             >
-                                Subaccount {sub.id}
+                                Subaccount {sub.name || sub.id}
                             </motion.button>
                         ))}
                     </div>
@@ -375,6 +437,7 @@ function CryptoViewContent() {
             {selectedPosition && (
                 <PositionDetailsModal
                     position={selectedPosition}
+                    protocol={protocol}
                     onClose={() => setSelectedPosition(null)}
                 />
             )}
@@ -432,7 +495,12 @@ function PositionRow({ position, onClick }: { position: Position; onClick?: () =
                     )}
                 </div>
                 <div>
-                    <p className="font-medium text-sm">{position.market}</p>
+                    <div className="flex items-center gap-2">
+                        <p className="font-medium text-sm">{position.market}</p>
+                        <span className="text-xs px-1.5 py-0.5 rounded bg-[rgb(var(--primary))]/10 text-[rgb(var(--primary))] font-medium">
+                            {position.leverage.toFixed(0)}x
+                        </span>
+                    </div>
                     <p className="text-xs text-[rgb(var(--foreground-muted))]">
                         {position.direction} · {position.size.toFixed(4)}
                     </p>
@@ -572,14 +640,19 @@ function BalanceRow({ balance }: { balance: Balance }) {
 // Position Details Modal
 function PositionDetailsModal({
     position,
+    protocol,
     onClose
 }: {
     position: Position;
+    protocol: 'DRIFT' | 'HYPERLIQUID';
     onClose: () => void;
 }) {
-    // Build Drift trade URL
+    // Build trade URL based on protocol
     const marketSlug = position.market.replace('-PERP', '').toUpperCase();
-    const driftUrl = `https://app.drift.trade/${marketSlug}-PERP`;
+    const externalUrl = protocol === 'HYPERLIQUID'
+        ? `https://app.hyperliquid.xyz/trade/${marketSlug}`
+        : `https://app.drift.trade/${marketSlug}-PERP`;
+    const platformName = protocol === 'HYPERLIQUID' ? 'Hyperliquid' : 'Drift';
 
     return (
         <motion.div
@@ -656,7 +729,7 @@ function PositionDetailsModal({
                         />
                         <DetailItem
                             label="Leverage"
-                            value={`${position.leverage.toFixed(2)}x`}
+                            value={`${position.leverage.toFixed(0)}x`}
                             valueColor={position.leverage > 10 ? "expense" : position.leverage > 5 ? "warning" : undefined}
                         />
                         <DetailItem
@@ -690,14 +763,14 @@ function PositionDetailsModal({
                     />
                 </div>
 
-                {/* Open in Drift Button */}
+                {/* Open in Platform Button */}
                 <a
-                    href={driftUrl}
+                    href={externalUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center justify-center gap-2 w-full py-3 px-4 rounded-xl bg-[rgb(var(--primary))] text-white font-medium hover:opacity-90 transition-opacity"
                 >
-                    Open in Drift
+                    Open in {platformName}
                     <ExternalLink className="w-4 h-4" />
                 </a>
             </motion.div>
