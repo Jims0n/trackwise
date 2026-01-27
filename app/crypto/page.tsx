@@ -5,17 +5,35 @@ import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { Search, Wallet, TrendingUp, Shield, ArrowRight, Loader2, X, Clock } from "lucide-react";
 import Link from "next/link";
+import { cn } from "@/lib/utils";
+
+type Protocol = 'DRIFT' | 'HYPERLIQUID';
 
 interface SavedWallet {
     address: string;
     label?: string;
+    protocol: Protocol;
     lastViewed: number;
 }
 
 const STORAGE_KEY = "trackwise_saved_wallets";
 
+// Detect protocol from address format
+function detectProtocol(address: string): Protocol | null {
+    // Ethereum address (0x prefix)
+    if (/^0x[a-fA-F0-9]{40}$/.test(address)) {
+        return 'HYPERLIQUID';
+    }
+    // Solana address (Base58, typically 32-44 chars, no 0x prefix)
+    if (/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(address)) {
+        return 'DRIFT';
+    }
+    return null;
+}
+
 export default function CryptoLandingPage() {
     const [walletInput, setWalletInput] = useState("");
+    const [protocol, setProtocol] = useState<Protocol>('DRIFT');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [savedWallets, setSavedWallets] = useState<SavedWallet[]>([]);
@@ -35,10 +53,11 @@ export default function CryptoLandingPage() {
     }, []);
 
     // Save wallet to localStorage
-    const saveWallet = (address: string) => {
+    const saveWallet = (address: string, walletProtocol: Protocol) => {
         const existing = savedWallets.find(w => w.address === address);
         const newWallet: SavedWallet = {
             address,
+            protocol: walletProtocol,
             lastViewed: Date.now(),
         };
 
@@ -68,36 +87,59 @@ export default function CryptoLandingPage() {
         }
     };
 
-    const handleViewWallet = async (addressOverride?: string) => {
+    const handleViewWallet = async (addressOverride?: string, protocolOverride?: Protocol) => {
         const address = addressOverride || walletInput.trim();
         if (!address) return;
 
         setIsLoading(true);
         setError(null);
 
+        // Auto-detect protocol from address format if not overridden
+        const detectedProtocol = protocolOverride || detectProtocol(address);
+        if (!detectedProtocol) {
+            setError("Invalid address format. Use Solana (Base58) for Drift or Ethereum (0x) for Hyperliquid.");
+            setIsLoading(false);
+            return;
+        }
+
+        const activeProtocol = detectedProtocol;
+        setProtocol(activeProtocol);
+
         try {
-            // Validate wallet by checking if it has subaccounts
-            const res = await fetch(`/api/drift/subaccounts?wallet=${address}`);
-            const data = await res.json();
+            if (activeProtocol === 'DRIFT') {
+                // Validate Drift wallet by checking if it has subaccounts
+                const res = await fetch(`/api/drift/subaccounts?wallet=${address}`);
+                const data = await res.json();
 
-            if (!res.ok) {
-                setError(data.error || "Invalid wallet address");
-                setIsLoading(false);
-                return;
-            }
+                if (!res.ok) {
+                    setError(data.error || "Invalid wallet address");
+                    setIsLoading(false);
+                    return;
+                }
 
-            if (data.count === 0) {
-                setError("No Drift accounts found for this wallet");
-                setIsLoading(false);
-                return;
+                if (data.count === 0) {
+                    setError("No Drift accounts found for this wallet");
+                    setIsLoading(false);
+                    return;
+                }
+            } else {
+                // Validate Hyperliquid wallet by fetching balances
+                const res = await fetch(`/api/hyperliquid/balances?wallet=${address}`);
+                const data = await res.json();
+
+                if (!res.ok) {
+                    setError(data.error || "Invalid wallet address");
+                    setIsLoading(false);
+                    return;
+                }
             }
 
             // Save wallet to localStorage
-            saveWallet(address);
+            saveWallet(address, activeProtocol);
 
-            // Navigate to view page
-            router.push(`/crypto/view?wallet=${address}`);
-        } catch (err) {
+            // Navigate to view page with protocol
+            router.push(`/crypto/view?wallet=${address}&protocol=${activeProtocol}`);
+        } catch {
             setError("Failed to validate wallet. Please try again.");
             setIsLoading(false);
         }
@@ -126,7 +168,7 @@ export default function CryptoLandingPage() {
                         className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[rgb(var(--primary))]/10 border border-[rgb(var(--primary))]/20 text-[rgb(var(--primary))] text-sm font-medium mb-8"
                     >
                         <TrendingUp className="w-4 h-4" />
-                        Drift Protocol Positions
+                        Multi-Protocol Positions Viewer
                     </motion.div>
 
                     {/* Title */}
@@ -146,11 +188,43 @@ export default function CryptoLandingPage() {
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.2 }}
-                        className="text-lg text-[rgb(var(--foreground-muted))] max-w-2xl mx-auto mb-12"
+                        className="text-lg text-[rgb(var(--foreground-muted))] max-w-2xl mx-auto mb-8"
                     >
-                        Enter any Solana wallet address to view Drift Protocol positions,
-                        balances, and subaccounts. Read-only, no wallet connection needed.
+                        Enter any wallet address to view perpetual positions and balances.
+                        Supports <span className="font-medium text-[rgb(var(--foreground))]">Drift</span> (Solana)
+                        and <span className="font-medium text-[rgb(var(--foreground))]">Hyperliquid</span> (EVM).
                     </motion.p>
+
+                    {/* Protocol Tabs */}
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.25 }}
+                        className="flex items-center justify-center gap-2 mb-6"
+                    >
+                        <button
+                            onClick={() => setProtocol('DRIFT')}
+                            className={cn(
+                                "px-4 py-2 rounded-xl text-sm font-medium transition-all",
+                                protocol === 'DRIFT'
+                                    ? "bg-[rgb(var(--primary))] text-white"
+                                    : "bg-[rgb(var(--card))] border border-[rgb(var(--border))] hover:border-[rgb(var(--primary))]/50"
+                            )}
+                        >
+                            🟣 Drift (Solana)
+                        </button>
+                        <button
+                            onClick={() => setProtocol('HYPERLIQUID')}
+                            className={cn(
+                                "px-4 py-2 rounded-xl text-sm font-medium transition-all",
+                                protocol === 'HYPERLIQUID'
+                                    ? "bg-[rgb(var(--primary))] text-white"
+                                    : "bg-[rgb(var(--card))] border border-[rgb(var(--border))] hover:border-[rgb(var(--primary))]/50"
+                            )}
+                        >
+                            🟢 Hyperliquid (EVM)
+                        </button>
+                    </motion.div>
 
                     {/* Wallet Input */}
                     <motion.div
@@ -163,11 +237,16 @@ export default function CryptoLandingPage() {
                             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[rgb(var(--foreground-muted))]" />
                             <input
                                 type="text"
-                                placeholder="Enter Solana wallet address..."
+                                placeholder={protocol === 'DRIFT'
+                                    ? "Enter Solana wallet address..."
+                                    : "Enter Ethereum wallet address (0x...)"}
                                 value={walletInput}
                                 onChange={(e) => {
                                     setWalletInput(e.target.value);
                                     setError(null);
+                                    // Auto-detect protocol from pasted address
+                                    const detected = detectProtocol(e.target.value);
+                                    if (detected) setProtocol(detected);
                                 }}
                                 onKeyDown={(e) => e.key === 'Enter' && handleViewWallet()}
                                 className="w-full pl-12 pr-32 py-4 rounded-2xl bg-[rgb(var(--card))] border border-[rgb(var(--border))] outline-none focus:border-[rgb(var(--primary))] transition-colors font-mono text-sm"
@@ -216,8 +295,11 @@ export default function CryptoLandingPage() {
                                         <div
                                             key={wallet.address}
                                             className="group flex items-center gap-2 px-3 py-2 rounded-xl bg-[rgb(var(--card))] border border-[rgb(var(--border))] hover:border-[rgb(var(--primary))] transition-colors cursor-pointer"
-                                            onClick={() => handleViewWallet(wallet.address)}
+                                            onClick={() => handleViewWallet(wallet.address, wallet.protocol)}
                                         >
+                                            <span className="text-xs">
+                                                {wallet.protocol === 'HYPERLIQUID' ? '🟢' : '🟣'}
+                                            </span>
                                             <span className="font-mono text-xs">
                                                 {wallet.address.slice(0, 4)}...{wallet.address.slice(-4)}
                                             </span>
