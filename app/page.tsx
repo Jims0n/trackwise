@@ -121,15 +121,27 @@ export default function Home() {
                     <TrendingUp className="w-5 h-5 text-[rgb(var(--primary))]" />
                   </div>
                   <div className="text-left">
-                    <p className="font-medium text-sm">Drift Positions</p>
+                    <p className="font-medium text-sm">Perps Tracker</p>
                     <p className="text-xs text-[rgb(var(--foreground-muted))]">
-                      View your perpetual positions
+                      Track positions across protocols
                     </p>
                   </div>
                 </div>
                 <ArrowRight className="w-5 h-5 text-[rgb(var(--primary))] group-hover:translate-x-1 transition-transform" />
               </motion.div>
             </Link>
+
+            {/* Supported Protocols */}
+            <div className="flex flex-wrap justify-center gap-2 mt-4">
+              {['Drift', 'Hyperliquid', 'Jupiter', 'Marginfi', 'Aster'].map((protocol) => (
+                <span
+                  key={protocol}
+                  className="text-[10px] px-2 py-1 rounded-full bg-[rgb(var(--card))] border border-[rgb(var(--border))] text-[rgb(var(--foreground-muted))]"
+                >
+                  {protocol}
+                </span>
+              ))}
+            </div>
           </motion.div>
         </motion.div>
       </div>
