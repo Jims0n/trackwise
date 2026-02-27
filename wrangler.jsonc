@@ -1,0 +1,25 @@
+{
+    "$schema": "node_modules/wrangler/config-schema.json",
+    "main": ".open-next/worker.js",
+    "name": "trackwise",
+    "compatibility_date": "2024-12-30",
+    "compatibility_flags": [
+        // Enable Node.js API compatibility (required for Prisma, Solana SDK, etc.)
+        "nodejs_compat",
+        // Allow fetching external URLs
+        "global_fetch_strictly_public"
+    ],
+    "assets": {
+        "directory": ".open-next/assets",
+        "binding": "ASSETS"
+    },
+    "services": [
+        {
+            "binding": "WORKER_SELF_REFERENCE",
+            "service": "trackwise"
+        }
+    ],
+    "images": {
+        "binding": "IMAGES"
+    }
+}
