@@ -55,7 +55,7 @@ export function AIInsights({ className }: AIInsightsProps) {
         fetchInsights();
     }, []);
 
-    // Auto-rotate insights every 5 seconds
+    // Auto-rotate insights every 5 secs
     useEffect(() => {
         if (insights.length <= 1) return;
         const interval = setInterval(() => {
@@ -74,9 +74,9 @@ export function AIInsights({ className }: AIInsightsProps) {
     };
 
     const iconColors = {
-        positive: 'text-emerald-500',
-        neutral: 'text-blue-500',
-        warning: 'text-amber-500',
+        positive: 'text-emerald-400',
+        neutral: 'text-blue-400',
+        warning: 'text-amber-400',
     };
 
     return (
